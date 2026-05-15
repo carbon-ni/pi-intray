@@ -46,19 +46,17 @@ import type {
 	ExtensionAPI,
 	ExtensionContext,
 	TurnEndEvent,
-	ModelRegistry,
 } from "@mariozechner/pi-coding-agent";
 import { getMarkdownTheme } from "@mariozechner/pi-coding-agent";
-import { complete, type Model, type Api, type UserMessage } from "@mariozechner/pi-ai";
 import { StringEnum } from "@mariozechner/pi-ai";
 import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import * as net from "node:net";
 import { getSocketPath } from "./infra/session-control-paths.ts";
 import { createAliasSymlink, ensureControlDir, getLiveSessions, isSocketAlive, removeAliasesForSocket, removeSocket, resolveSessionIdFromAlias } from "./infra/control-store.ts";
 import { sendRpcCommand } from "./infra/rpc-client.ts";
-import { createRpcServer, writeEvent, writeResponse } from "./infra/rpc-server.ts";
+import { closeRpcServer, createRpcServer, writeEvent, writeResponse, type RpcServer, type RpcSocket } from "./infra/rpc-server.ts";
 import { updateProcessSessionEnv } from "./infra/session-env.ts";
+import { selectSummarizationModel, summarizeConversation } from "./infra/summarizer.ts";
 import { renderSessionMessage } from "./pi/message-renderer.ts";
 import { registerListSessionsTool } from "./pi/list-sessions-tool.ts";
 import { maybeHandleStartupControlSend } from "./pi/startup-send.ts";
@@ -78,12 +76,12 @@ const SESSION_MESSAGE_TYPE = "session-message";
 // ============================================================================
 
 interface TurnEndSubscription {
-	socket: net.Socket;
+	socket: RpcSocket;
 	subscriptionId: string;
 }
 
 interface SocketState {
-	server: net.Server | null;
+	server: RpcServer | null;
 	socketPath: string | null;
 	context: ExtensionContext | null;
 	alias: string | null;
@@ -94,39 +92,6 @@ interface SocketState {
 // ============================================================================
 // Summarization
 // ============================================================================
-
-const CODEX_MODEL_ID = "gpt-5.1-codex-mini";
-const HAIKU_MODEL_ID = "claude-haiku-4-5";
-
-const SUMMARIZATION_SYSTEM_PROMPT = `You are a conversation summarizer. Create concise, accurate summaries that preserve key information, decisions, and outcomes.`;
-
-const TURN_SUMMARY_PROMPT = `Summarize what happened in this conversation since the last user prompt. Focus on:
-- What was accomplished
-- Any decisions made
-- Files that were read, modified, or created
-- Any errors or issues encountered
-- Current state/next steps
-
-Be concise but comprehensive. Preserve exact file paths, function names, and error messages.`;
-
-async function selectSummarizationModel(
-	currentModel: Model<Api> | undefined,
-	modelRegistry: ModelRegistry,
-): Promise<Model<Api> | undefined> {
-	const codexModel = modelRegistry.find("openai-codex", CODEX_MODEL_ID);
-	if (codexModel) {
-		const auth = await modelRegistry.getApiKeyAndHeaders(codexModel);
-		if (auth.ok) return codexModel;
-	}
-
-	const haikuModel = modelRegistry.find("anthropic", HAIKU_MODEL_ID);
-	if (haikuModel) {
-		const auth = await modelRegistry.getApiKeyAndHeaders(haikuModel);
-		if (auth.ok) return haikuModel;
-	}
-
-	return currentModel;
-}
 
 // ============================================================================
 // Utilities
@@ -164,7 +129,7 @@ async function handleCommand(
 	pi: ExtensionAPI,
 	state: SocketState,
 	command: RpcCommand,
-	socket: net.Socket,
+	socket: RpcSocket,
 ): Promise<void> {
 	const id = "id" in command && typeof command.id === "string" ? command.id : undefined;
 	const respond = (success: boolean, commandName: string, data?: unknown, error?: string) => {
@@ -241,33 +206,7 @@ async function handleCommand(
 		}
 
 		try {
-			const conversationText = messages
-				.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
-				.join("\n\n");
-
-			const userMessage: UserMessage = {
-				role: "user",
-				content: [{ type: "text", text: `<conversation>\n${conversationText}\n</conversation>\n\n${TURN_SUMMARY_PROMPT}` }],
-				timestamp: Date.now(),
-			};
-
-			const response = await complete(
-				model,
-				{ systemPrompt: SUMMARIZATION_SYSTEM_PROMPT, messages: [userMessage] },
-				{ apiKey: auth.apiKey, headers: auth.headers },
-			);
-
-			if (response.stopReason === "aborted" || response.stopReason === "error") {
-				respond(false, "get_summary", undefined, "Summarization failed");
-				return;
-			}
-
-			const summary = response.content
-				.filter((c): c is { type: "text"; text: string } => c.type === "text")
-				.map((c) => c.text)
-				.join("\n");
-
-			respond(true, "get_summary", { summary, model: model.id });
+			respond(true, "get_summary", await summarizeConversation(messages, model, auth));
 		} catch (error) {
 			respond(false, "get_summary", undefined, error instanceof Error ? error.message : "Summarization failed");
 		}
@@ -387,7 +326,7 @@ async function stopControlServer(state: SocketState): Promise<void> {
 	const socketPath = state.socketPath;
 	state.socketPath = null;
 	state.turnEndSubscriptions = [];
-	await new Promise<void>((resolve) => state.server?.close(() => resolve()));
+	await closeRpcServer(state.server);
 	state.server = null;
 	await removeAliasesForSocket(socketPath);
 	await removeSocket(socketPath);

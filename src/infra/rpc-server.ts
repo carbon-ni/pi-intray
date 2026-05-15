@@ -1,9 +1,11 @@
 import * as net from "node:net";
 import { parseCommand, type RpcCommand, type RpcEvent, type RpcResponse } from "../domain/index.ts";
 
-export type RpcCommandHandler = (command: RpcCommand, socket: net.Socket) => void | Promise<void>;
+export type RpcSocket = Pick<net.Socket, "write" | "once">;
+export type RpcServer = Pick<net.Server, "close">;
+export type RpcCommandHandler = (command: RpcCommand, socket: RpcSocket) => void | Promise<void>;
 
-export function writeResponse(socket: net.Socket, response: RpcResponse): void {
+export function writeResponse(socket: RpcSocket, response: RpcResponse): void {
 	try {
 		socket.write(`${JSON.stringify(response)}\n`);
 	} catch {
@@ -11,7 +13,7 @@ export function writeResponse(socket: net.Socket, response: RpcResponse): void {
 	}
 }
 
-export function writeEvent(socket: net.Socket, event: RpcEvent): void {
+export function writeEvent(socket: RpcSocket, event: RpcEvent): void {
 	try {
 		socket.write(`${JSON.stringify(event)}\n`);
 	} catch {
@@ -23,7 +25,7 @@ export async function createRpcServer(
 	socketPath: string,
 	onCommand: RpcCommandHandler,
 	onParseError?: () => void | Promise<void>,
-): Promise<net.Server> {
+): Promise<RpcServer> {
 	const server = net.createServer((socket) => {
 		socket.setEncoding("utf8");
 		let buffer = "";
@@ -62,4 +64,8 @@ export async function createRpcServer(
 	});
 
 	return server;
+}
+
+export async function closeRpcServer(server: RpcServer): Promise<void> {
+	await new Promise<void>((resolve) => server.close(() => resolve()));
 }
