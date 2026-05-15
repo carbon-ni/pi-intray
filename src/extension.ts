@@ -58,6 +58,9 @@ import { getSocketPath } from "./infra/session-control-paths.ts";
 import { createAliasSymlink, ensureControlDir, getLiveSessions, isSocketAlive, removeAliasesForSocket, removeSocket, resolveSessionIdFromAlias } from "./infra/control-store.ts";
 import { sendRpcCommand } from "./infra/rpc-client.ts";
 import { renderSessionMessage } from "./pi/message-renderer.ts";
+import { registerListSessionsTool } from "./pi/list-sessions-tool.ts";
+import { maybeHandleStartupControlSend } from "./pi/startup-send.ts";
+import { registerControlSessionsCommand, registerSessionControlCommand } from "./pi/control-commands.ts";
 import { CONTROL_FLAG, CONTROL_SHORT_FLAG, isSafeAlias, isSafeSessionId, isSessionControlRequested, normalizeMode, normalizeWaitUntil, parseCommand, parseSessionControlAction, type SessionControlAction, type RpcCommand, type RpcEvent, type RpcResponse, type RpcSubscribeCommand, type RpcSendCommand, type ExtractedMessage } from "./domain/index.ts";
 export { isSafeAlias, isSafeSessionId, isSessionControlRequested, normalizeMode, normalizeWaitUntil, parseCommand, parseSessionControlAction } from "./domain/index.ts";
 
@@ -620,7 +623,7 @@ export default function (pi: ExtensionAPI) {
 		registerSessionTool(pi, state);
 		registerListSessionsTool(pi);
 	}
-	registerSessionControlCommand(pi, state);
+	registerSessionControlCommand(pi, state, { enableControlServer, disableControlServer });
 	registerControlSessionsCommand(pi, state);
 
 	const refreshServer = async (ctx: ExtensionContext) => {
@@ -635,7 +638,13 @@ export default function (pi: ExtensionAPI) {
 		await refreshServer(ctx);
 		if (!cliSendHandled) {
 			cliSendHandled = true;
-			await maybeHandleStartupControlSend(pi, ctx);
+			await maybeHandleStartupControlSend(pi, ctx, {
+				target: CONTROL_TARGET_FLAG,
+				message: CONTROL_SEND_MESSAGE_FLAG,
+				mode: CONTROL_SEND_MODE_FLAG,
+				wait: CONTROL_SEND_WAIT_FLAG,
+				includeSender: CONTROL_SEND_INCLUDE_SENDER_FLAG,
+			});
 		}
 	});
 
@@ -1073,275 +1082,3 @@ Messages automatically include sender session info for replies. When you want a 
 	});
 }
 
-// ============================================================================
-// Tool: list_sessions
-// ============================================================================
-
-function registerListSessionsTool(pi: ExtensionAPI): void {
-	pi.registerTool({
-		name: "list_sessions",
-		label: "List Sessions",
-		description: "List live sessions that expose a control socket (optionally with session names). Use this for discovery only; for the current session id in shell/bash use $PI_SESSION_ID.",
-		parameters: Type.Object({}),
-		async execute(_toolCallId, _params, _signal, _onUpdate, _ctx) {
-			const sessions = await getLiveSessions();
-
-			if (sessions.length === 0) {
-				return {
-					content: [{ type: "text", text: "No live sessions found." }],
-					details: { sessions: [] },
-				};
-			}
-
-			const lines = sessions.map((session) => {
-				const name = session.name ? ` (${session.name})` : "";
-				return `- ${session.sessionId}${name}`;
-			});
-
-			return {
-				content: [{ type: "text", text: `Live sessions:\n${lines.join("\n")}` }],
-				details: { sessions },
-			};
-		},
-	});
-}
-
-type StartupControlSendOptions = {
-	target: string;
-	message: string;
-	mode: "steer" | "follow_up";
-	waitUntil?: "turn_end" | "message_processed";
-	includeSenderInfo: boolean;
-};
-
-function getStringFlag(pi: ExtensionAPI, name: string): string | undefined {
-	const value = pi.getFlag(name);
-	if (typeof value !== "string") return undefined;
-	const trimmed = value.trim();
-	return trimmed.length > 0 ? trimmed : undefined;
-}
-
-function parseStartupControlSendOptions(pi: ExtensionAPI): { options?: StartupControlSendOptions; error?: string } {
-	const target = getStringFlag(pi, CONTROL_TARGET_FLAG);
-	const message = getStringFlag(pi, CONTROL_SEND_MESSAGE_FLAG);
-
-	if (!target && !message) {
-		return {};
-	}
-	if (target && !message) {
-		return { error: `Missing --${CONTROL_SEND_MESSAGE_FLAG} (required with --${CONTROL_TARGET_FLAG})` };
-	}
-	if (!target && message) {
-		return { error: `Missing --${CONTROL_TARGET_FLAG} (required with --${CONTROL_SEND_MESSAGE_FLAG})` };
-	}
-
-	const rawMode = getStringFlag(pi, CONTROL_SEND_MODE_FLAG) ?? "steer";
-	const mode = normalizeMode(rawMode);
-	if (!mode) {
-		return { error: `Invalid --${CONTROL_SEND_MODE_FLAG}: ${rawMode}. Use steer|follow_up.` };
-	}
-
-	const rawWait = getStringFlag(pi, CONTROL_SEND_WAIT_FLAG);
-	let waitUntil: "turn_end" | "message_processed" | undefined;
-	if (rawWait) {
-		const normalized = normalizeWaitUntil(rawWait);
-		if (!normalized) {
-			return {
-				error: `Invalid --${CONTROL_SEND_WAIT_FLAG}: ${rawWait}. Use turn_end|message_processed.`,
-			};
-		}
-		waitUntil = normalized;
-	}
-
-	const includeSenderInfo = pi.getFlag(CONTROL_SEND_INCLUDE_SENDER_FLAG) === true;
-
-	return {
-		options: {
-			target: target!,
-			message: message!,
-			mode,
-			waitUntil,
-			includeSenderInfo,
-		},
-	};
-}
-
-function reportStartupControlSend(ctx: ExtensionContext, message: string, level: "info" | "warning" | "error" = "info"): void {
-	if (ctx.hasUI) {
-		ctx.ui.notify(message, level);
-		return;
-	}
-	if (level === "error") {
-		console.error(message);
-		return;
-	}
-	console.log(message);
-}
-
-async function maybeHandleStartupControlSend(pi: ExtensionAPI, ctx: ExtensionContext): Promise<void> {
-	const parsed = parseStartupControlSendOptions(pi);
-	if (!parsed.options) {
-		if (parsed.error) {
-			reportStartupControlSend(ctx, parsed.error, "error");
-		}
-		return;
-	}
-
-	const { target, message, mode, waitUntil, includeSenderInfo } = parsed.options;
-	let targetSessionId = await resolveSessionIdFromAlias(target);
-	if (!targetSessionId && isSafeSessionId(target)) {
-		targetSessionId = target;
-	}
-
-	if (!targetSessionId) {
-		reportStartupControlSend(ctx, `Unknown target session: ${target}`, "error");
-		return;
-	}
-
-	const socketPath = getSocketPath(targetSessionId);
-	const alive = await isSocketAlive(socketPath);
-	if (!alive) {
-		reportStartupControlSend(ctx, `Target session not reachable: ${target}`, "error");
-		return;
-	}
-
-	const senderInfo = includeSenderInfo
-		? (() => {
-			const senderSessionId = ctx.sessionManager.getSessionId();
-			const senderSessionName = ctx.sessionManager.getSessionName()?.trim();
-			return senderSessionId
-				? `\n\n<sender_info>${JSON.stringify({
-					sessionId: senderSessionId,
-					sessionName: senderSessionName || undefined,
-				})}</sender_info>`
-				: "";
-		})()
-		: "";
-
-	const sendCommand: RpcSendCommand = {
-		type: "send",
-		message: message + senderInfo,
-		mode,
-	};
-
-	try {
-		if (waitUntil === "turn_end") {
-			const result = await sendRpcCommand(socketPath, sendCommand, {
-				timeout: 300000,
-				waitForEvent: "turn_end",
-			});
-			if (!result.response.success) {
-				reportStartupControlSend(ctx, `Failed to send: ${result.response.error ?? "unknown error"}`, "error");
-				return;
-			}
-			const lastMessage = result.event?.message;
-			if (!lastMessage?.content) {
-				reportStartupControlSend(ctx, `Message delivered to ${target}; turn completed without assistant output.`);
-				return;
-			}
-			if (ctx.hasUI) {
-				pi.sendMessage(
-					{
-						customType: "control-send",
-						content: `Startup response from ${target}:\n\n${lastMessage.content}`,
-						display: true,
-					},
-					{ triggerTurn: false },
-				);
-			} else {
-				console.log(lastMessage.content);
-			}
-			return;
-		}
-
-		const result = await sendRpcCommand(socketPath, sendCommand, { timeout: 30000 });
-		if (!result.response.success) {
-			reportStartupControlSend(ctx, `Failed to send: ${result.response.error ?? "unknown error"}`, "error");
-			return;
-		}
-
-		const waitLabel = waitUntil === "message_processed" ? " (message processed)" : "";
-		reportStartupControlSend(ctx, `Message sent to ${target}${waitLabel}`);
-	} catch (error) {
-		const msg = error instanceof Error ? error.message : "unknown error";
-		reportStartupControlSend(ctx, `Failed to send to ${target}: ${msg}`, "error");
-	}
-}
-
-function registerSessionControlCommand(pi: ExtensionAPI, state: SocketState): void {
-	pi.registerCommand("session-control", {
-		description: "Start, stop, or show status for the current session control socket",
-		getArgumentCompletions: (prefix) => {
-			const actions: SessionControlAction[] = ["start", "stop", "status"];
-			const matches = actions.filter((action) => action.startsWith(prefix.trim()));
-			return matches.length > 0 ? matches.map((value) => ({ value, label: value })) : null;
-		},
-		handler: async (args, ctx) => {
-			const parsed = parseSessionControlAction(args);
-			if (!parsed.action) {
-				if (ctx.hasUI) ctx.ui.notify(parsed.error ?? "Invalid session-control action", "error");
-				return;
-			}
-
-			if (parsed.action === "start") {
-				await enableControlServer(pi, state, ctx);
-				const label = state.alias ? ` (${state.alias})` : "";
-				if (ctx.hasUI) ctx.ui.notify(`Session control started: ${ctx.sessionManager.getSessionId()}${label}`, "info");
-				return;
-			}
-
-			if (parsed.action === "stop") {
-				await disableControlServer(state, ctx);
-				if (ctx.hasUI) ctx.ui.notify("Session control stopped", "info");
-				return;
-			}
-
-			const sessionId = ctx.sessionManager.getSessionId();
-			const status = state.server && state.socketPath
-				? `Session control is running for ${sessionId}\nSocket: ${state.socketPath}`
-				: "Session control is stopped. Use /session-control start to expose this session.";
-			pi.sendMessage(
-				{
-					customType: "session-control-status",
-					content: status,
-					display: true,
-				},
-				{ triggerTurn: false },
-			);
-		},
-	});
-}
-
-function registerControlSessionsCommand(pi: ExtensionAPI, state: SocketState): void {
-	pi.registerCommand("control-sessions", {
-		description: "List controllable sessions (from session-control sockets)",
-		handler: async (_args, ctx) => {
-			if (!isSessionControlRequested((name) => pi.getFlag(name)) && !state.server) {
-				if (ctx.hasUI) {
-					ctx.ui.notify("Session control not enabled (use /session-control start or --session-control)", "warning");
-				}
-				return;
-			}
-
-			const sessions = await getLiveSessions();
-			const currentSessionId = ctx.sessionManager.getSessionId();
-			const lines = sessions.map((session) => {
-				const name = session.name ? ` (${session.name})` : "";
-				const current = session.sessionId === currentSessionId ? " (current)" : "";
-				return `- ${session.sessionId}${name}${current}`;
-			});
-			const content = sessions.length === 0
-				? "No live sessions found."
-				: `Controllable sessions:\n${lines.join("\n")}`;
-
-			pi.sendMessage(
-				{
-					customType: "control-sessions",
-					content,
-					display: true,
-				},
-				{ triggerTurn: false },
-			);
-		},
-	});
-}
