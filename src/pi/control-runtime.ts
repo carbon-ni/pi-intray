@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionContext, TurnEndEvent } from "@mariozechner/pi-coding-agent";
-import { getSocketPath } from "../infra/session-control-paths.ts";
+import { getSocketPath } from "../infra/intray-paths.ts";
 import { createAliasSymlink, ensureControlDir, removeAliasesForSocket, removeSocket } from "../infra/control-store.ts";
 import { closeRpcServer, createRpcServer, writeEvent, writeResponse, type RpcServer, type RpcSocket } from "../infra/rpc-server.ts";
 import { updateProcessSessionEnv } from "../infra/session-env.ts";
@@ -32,7 +32,7 @@ export interface SocketState {
 // Utilities
 // ============================================================================
 
-const STATUS_KEY = "session-control";
+const STATUS_KEY = "intray";
 
 function getSessionAlias(ctx: ExtensionContext): string | null {
 	const sessionName = ctx.sessionManager.getSessionName();

@@ -6,7 +6,7 @@ export function registerListSessionsTool(pi: ExtensionAPI): void {
 	pi.registerTool({
 		name: "list_sessions",
 		label: "List Sessions",
-		description: "List live sessions that expose a control socket (optionally with session names). Use this for discovery only; for the current session id in shell/bash use $PI_SESSION_ID.",
+		description: "List live sessions that expose an intray socket (optionally with session names). Use this for discovery only; for the current session id in shell/bash use $PI_SESSION_ID.",
 		parameters: Type.Object({}),
 		async execute(_toolCallId, _params, _signal, _onUpdate, _ctx) {
 			const sessions = await getLiveSessions();

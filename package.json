@@ -1,5 +1,5 @@
 {
-  "name": "session-control",
+  "name": "intray",
   "version": "0.1.0",
   "description": "Control and communicate with running Pi sessions over Unix sockets",
   "type": "module",

@@ -67,12 +67,15 @@ test("normalizeWaitUntil accepts documented aliases", () => {
 	assert.equal(normalizeWaitUntil("done"), null);
 });
 
-test("isSessionControlRequested accepts long and shorthand flags", () => {
+test("isSessionControlRequested accepts only intray flags", () => {
 	const noFlags = () => undefined;
-	assert.equal(isSessionControlRequested(noFlags, ["--session-control"]), true);
-	assert.equal(isSessionControlRequested(noFlags, ["--sc"]), true);
-	assert.equal(isSessionControlRequested((name) => name === "session-control", []), true);
-	assert.equal(isSessionControlRequested((name) => name === "sc", []), true);
+	assert.equal(isSessionControlRequested(noFlags, ["--intray"]), true);
+	assert.equal(isSessionControlRequested(noFlags, ["--in"]), true);
+	assert.equal(isSessionControlRequested((name) => name === "intray", []), true);
+	assert.equal(isSessionControlRequested((name) => name === "in", []), true);
+	assert.equal(isSessionControlRequested(noFlags, ["--pi-intray"]), false);
+	assert.equal(isSessionControlRequested(noFlags, ["--session-control"]), false);
+	assert.equal(isSessionControlRequested(noFlags, ["--sc"]), false);
 	assert.equal(isSessionControlRequested(noFlags, []), false);
 });
 
@@ -85,9 +88,9 @@ test("parseSessionControlAction accepts runtime control actions", () => {
 
 test("parseSessionControlAction rejects unknown or extra arguments", () => {
 	assert.deepEqual(parseSessionControlAction("restart"), {
-		error: "Unknown session-control action: restart. Use start|stop|status.",
+		error: "Unknown intray action: restart. Use start|stop|status.",
 	});
 	assert.deepEqual(parseSessionControlAction("start now"), {
-		error: "Too many arguments. Use /session-control start|stop|status.",
+		error: "Too many arguments. Use /intray start|stop|status.",
 	});
 });

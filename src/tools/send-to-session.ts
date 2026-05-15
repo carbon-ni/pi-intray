@@ -2,7 +2,7 @@ import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-age
 import { getMarkdownTheme } from "@mariozechner/pi-coding-agent";
 import { Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import { getSocketPath } from "../infra/session-control-paths.ts";
+import { getSocketPath } from "../infra/intray-paths.ts";
 import { resolveSessionIdFromAlias } from "../infra/control-store.ts";
 import { sendRpcCommand } from "../infra/rpc-client.ts";
 import { isSafeSessionId, type ExtractedMessage, type RpcSendCommand } from "../domain/index.ts";
@@ -19,7 +19,7 @@ export function registerSessionTool(pi: ExtensionAPI, state: SessionToolState): 
 	pi.registerTool({
 		name: "send_to_session",
 		label: "Send To Session",
-		description: `Interact with another running pi session via its control socket.
+		description: `Interact with another running session via its intray socket.
 
 Actions:
 - send: Send a message (default). Requires 'message' parameter.
@@ -36,11 +36,11 @@ Wait behavior (only for action=send):
 - wait_until=message_processed: Returns immediately after message is queued.
 
 CLI bridge (for shell scripts/background jobs):
-- Current session id is available in shell/bash as $PI_SESSION_ID (set when --session-control is enabled).
+- Current session id is available in shell/bash as $PI_SESSION_ID (set when --intray is enabled).
 - Use $PI_SESSION_ID when you need the current session; do not call list_sessions just to discover your own id.
-- Target session must be running with --session-control.
+- Target session must be running with --intray.
 - One-shot startup send is available via extension flags:
-  --session-control
+  --intray
   --control-session <session-name|session-id>
   --send-session-message <text>
   --send-session-mode <steer|follow_up> (optional, default: steer)
@@ -49,9 +49,9 @@ CLI bridge (for shell scripts/background jobs):
 - Startup sends are one-way by default (no sender_info), which avoids reply attempts to short-lived 'pi -p' sender sessions.
 - If a script needs a response, use --send-session-wait turn_end and read stdout.
 - Example script usage (one-way):
-  pi -p --session-control --control-session "$PI_SESSION_ID" --send-session-message "Background task finished" --send-session-mode follow_up --send-session-wait message_processed
+  pi -p --intray --control-session "$PI_SESSION_ID" --send-session-message "Background task finished" --send-session-mode follow_up --send-session-wait message_processed
 - Example request/response usage:
-  pi -p --session-control --control-session "$PI_SESSION_ID" --send-session-message "What is the current time?" --send-session-wait turn_end
+  pi -p --intray --control-session "$PI_SESSION_ID" --send-session-message "What is the current time?" --send-session-wait turn_end
 
 Note: If you ask the target session to reply back via sender_info, do not use wait_until; waiting is redundant and can duplicate responses.
 

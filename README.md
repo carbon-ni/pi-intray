@@ -1,29 +1,29 @@
-# session-control
+# intray
 
 Pi extension inspired by `mitsuhiko/agent-stuff/extensions/control.ts`.
 
-It exposes running Pi sessions through Unix sockets under `~/.pi/session-control/`.
+It exposes running Pi sessions through Unix sockets under `~/.pi/intray/`.
 
 ## Usage
 
 ```bash
-pi --session-control
+pi --intray
 # shorthand
-pi --sc
+pi --in
 ```
 
 Or expose the current session after Pi is already running:
 
 ```text
-/session-control start
-/session-control status
-/session-control stop
+/intray start
+/intray status
+/intray stop
 ```
 
 One-shot send:
 
 ```bash
-pi -p --sc \
+pi -p --in \
   --control-session <session-name-or-id> \
   --send-session-message "please summarize your state" \
   --send-session-wait turn_end
@@ -32,9 +32,9 @@ pi -p --sc \
 Inside Pi, the extension adds:
 
 - `send_to_session` tool: send a message to another running session
-- `list_control_sessions` tool: list live controllable sessions
-- `/session-control` command: start, stop, or show status for this session's control socket
-- `/control-sessions` command: show live sessions
+- `list_sessions` tool: list live sessions exposing an intray socket
+- `/intray` command: start, stop, or show status for this session's intray socket
+- `/intray-sessions` command: show live sessions
 
 ## RPC
 

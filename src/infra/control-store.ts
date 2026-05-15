@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import * as net from "node:net";
 import * as path from "node:path";
 import { isSafeAlias, isSafeSessionId } from "../domain/session-id.ts";
-import { CONTROL_DIR, SOCKET_SUFFIX, getAliasPath } from "./session-control-paths.ts";
+import { CONTROL_DIR, SOCKET_SUFFIX, getAliasPath } from "./intray-paths.ts";
 
 function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
 	return typeof error === "object" && error !== null && "code" in error;

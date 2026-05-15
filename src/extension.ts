@@ -1,9 +1,9 @@
 /**
- * Session Control Extension
+ * Intray Extension
  *
- * Enables inter-session communication via Unix domain sockets.  When enabled with
- * the `--session-control` flag, each pi session creates a control socket at
- * `~/.pi/session-control/<session-id>.sock` that accepts JSON-RPC commands.
+ * Enables inter-session communication via Unix domain sockets. When enabled with
+ * the `--intray` flag, each session creates an intray socket at
+ * `~/.pi/intray/<session-id>.sock` that accepts JSON-RPC commands.
  *
  * Features:
  * - Send messages to other running pi sessions (steer or follow-up mode)
@@ -17,10 +17,10 @@
  * communicate with other pi sessions programmatically.
  *
  * Usage:
- *   pi --session-control
+ *   pi --intray
  *
  * One-shot startup send:
- *   pi -p --session-control --control-session <session-name|session-id> --send-session-message <text>
+ *   pi -p --intray --control-session <session-name|session-id> --send-session-message <text>
  *     [--send-session-mode steer|follow_up] [--send-session-wait turn_end|message_processed]
  *     [--send-session-include-sender-info]
  *   (startup send is one-way by default; use --send-session-wait turn_end to capture response on stdout)
@@ -71,11 +71,11 @@ function shouldRegisterControlTools(pi: ExtensionAPI): boolean {
 
 export default function (pi: ExtensionAPI) {
 	pi.registerFlag(CONTROL_FLAG, {
-		description: "Enable per-session control socket under ~/.pi/session-control",
+		description: "Enable an intray socket under ~/.pi/intray",
 		type: "boolean",
 	});
 	pi.registerFlag(CONTROL_SHORT_FLAG, {
-		description: "Alias for --session-control",
+		description: "Alias for --intray",
 		type: "boolean",
 	});
 	pi.registerFlag(CONTROL_TARGET_FLAG, {

@@ -1,5 +1,5 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import { getSocketPath } from "../infra/session-control-paths.ts";
+import { getSocketPath } from "../infra/intray-paths.ts";
 import { isSocketAlive, resolveSessionIdFromAlias } from "../infra/control-store.ts";
 import { sendRpcCommand } from "../infra/rpc-client.ts";
 import { isSafeSessionId, normalizeMode, normalizeWaitUntil, type RpcSendCommand } from "../domain/index.ts";

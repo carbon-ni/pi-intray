@@ -14,8 +14,8 @@ type ControlCommandDeps = {
 };
 
 export function registerSessionControlCommand(pi: ExtensionAPI, state: ControlState, deps: ControlCommandDeps): void {
-	pi.registerCommand("session-control", {
-		description: "Start, stop, or show status for the current session control socket",
+	pi.registerCommand("intray", {
+		description: "Start, stop, or show status for the current intray socket",
 		getArgumentCompletions: (prefix) => {
 			const actions: SessionControlAction[] = ["start", "stop", "status"];
 			const matches = actions.filter((action) => action.startsWith(prefix.trim()));
@@ -24,30 +24,30 @@ export function registerSessionControlCommand(pi: ExtensionAPI, state: ControlSt
 		handler: async (args, ctx) => {
 			const parsed = parseSessionControlAction(args);
 			if (!parsed.action) {
-				if (ctx.hasUI) ctx.ui.notify(parsed.error ?? "Invalid session-control action", "error");
+				if (ctx.hasUI) ctx.ui.notify(parsed.error ?? "Invalid intray action", "error");
 				return;
 			}
 
 			if (parsed.action === "start") {
 				await deps.enableControlServer(pi, state, ctx);
 				const label = state.alias ? ` (${state.alias})` : "";
-				if (ctx.hasUI) ctx.ui.notify(`Session control started: ${ctx.sessionManager.getSessionId()}${label}`, "info");
+				if (ctx.hasUI) ctx.ui.notify(`Intray started: ${ctx.sessionManager.getSessionId()}${label}`, "info");
 				return;
 			}
 
 			if (parsed.action === "stop") {
 				await deps.disableControlServer(state, ctx);
-				if (ctx.hasUI) ctx.ui.notify("Session control stopped", "info");
+				if (ctx.hasUI) ctx.ui.notify("Intray stopped", "info");
 				return;
 			}
 
 			const sessionId = ctx.sessionManager.getSessionId();
 			const status = state.server && state.socketPath
-				? `Session control is running for ${sessionId}\nSocket: ${state.socketPath}`
-				: "Session control is stopped. Use /session-control start to expose this session.";
+				? `Intray is running for ${sessionId}\nSocket: ${state.socketPath}`
+				: "Intray is stopped. Use /intray start to expose this session.";
 			pi.sendMessage(
 				{
-					customType: "session-control-status",
+					customType: "intray-status",
 					content: status,
 					display: true,
 				},
@@ -58,12 +58,12 @@ export function registerSessionControlCommand(pi: ExtensionAPI, state: ControlSt
 }
 
 export function registerControlSessionsCommand(pi: ExtensionAPI, state: ControlState): void {
-	pi.registerCommand("control-sessions", {
-		description: "List controllable sessions (from session-control sockets)",
+	pi.registerCommand("intray-sessions", {
+		description: "List controllable sessions (from intray sockets)",
 		handler: async (_args, ctx) => {
 			if (!isSessionControlRequested((name) => pi.getFlag(name)) && !state.server) {
 				if (ctx.hasUI) {
-					ctx.ui.notify("Session control not enabled (use /session-control start or --session-control)", "warning");
+					ctx.ui.notify("Intray not enabled (use /intray start or --intray)", "warning");
 				}
 				return;
 			}
@@ -81,7 +81,7 @@ export function registerControlSessionsCommand(pi: ExtensionAPI, state: ControlS
 
 			pi.sendMessage(
 				{
-					customType: "control-sessions",
+					customType: "intray-sessions",
 					content,
 					display: true,
 				},

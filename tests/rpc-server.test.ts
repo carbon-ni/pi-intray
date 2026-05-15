@@ -9,7 +9,7 @@ import { createRpcServer } from "../src/infra/rpc-server.ts";
 import type { RpcCommand } from "../src/domain/index.ts";
 
 async function withSocketServer(run: (socketPath: string) => Promise<void>): Promise<void> {
-	const dir = await mkdtemp(path.join(tmpdir(), "pi-intray-rpc-server-"));
+	const dir = await mkdtemp(path.join(tmpdir(), "intray-rpc-server-"));
 	try {
 		await run(path.join(dir, "server.sock"));
 	} finally {
