@@ -1,10 +1,11 @@
 import type { ExtensionAPI, ExtensionContext, TurnEndEvent } from "@mariozechner/pi-coding-agent";
 import { getSocketPath } from "../infra/intray-paths.ts";
-import { createAliasSymlink, ensureControlDir, removeAliasesForSocket, removeSocket } from "../infra/control-store.ts";
+import { createAliasSymlink, ensureControlDir, getAliasNames, removeAliasesForSocket, removeSocket } from "../infra/control-store.ts";
+import { getCurrentGitBranch } from "../infra/git-branch.ts";
 import { closeRpcServer, createRpcServer, writeEvent, writeResponse, type RpcServer, type RpcSocket } from "../infra/rpc-server.ts";
 import { updateProcessSessionEnv } from "../infra/session-env.ts";
 import { selectSummarizationModel, summarizeConversation } from "../infra/summarizer.ts";
-import { getFirstEntryId, getLastAssistantMessage, getMessagesSinceLastPrompt, isSafeAlias, type RpcCommand, SESSION_MESSAGE_TYPE } from "../domain/index.ts";
+import { createBranchAlias, createSequentialBranchAlias, getFirstEntryId, getLastAssistantMessage, getMessagesSinceLastPrompt, isSafeAlias, type RpcCommand, SESSION_MESSAGE_TYPE } from "../domain/index.ts";
 
 // ============================================================================
 // Subscription Management
@@ -19,7 +20,7 @@ export interface SocketState {
 	server: RpcServer | null;
 	socketPath: string | null;
 	context: ExtensionContext | null;
-	alias: string | null;
+	aliases: string[];
 	aliasTimer: ReturnType<typeof setInterval> | null;
 	turnEndSubscriptions: TurnEndSubscription[];
 }
@@ -41,19 +42,29 @@ function getSessionAlias(ctx: ExtensionContext): string | null {
 	return alias;
 }
 
+async function getBranchAlias(currentAliases: string[]): Promise<string | null> {
+	const branch = await getCurrentGitBranch();
+	const baseAlias = branch ? createBranchAlias(branch) : null;
+	if (!branch || !baseAlias) return null;
+	const currentAlias = currentAliases.find((alias) => alias.startsWith(`${baseAlias}-`));
+	return createSequentialBranchAlias(branch, await getAliasNames(), currentAlias);
+}
+
+async function getSessionAliases(ctx: ExtensionContext, currentAliases: string[]): Promise<string[]> {
+	const aliases = [getSessionAlias(ctx), await getBranchAlias(currentAliases)].filter((alias): alias is string => Boolean(alias));
+	return Array.from(new Set(aliases));
+}
+
 async function syncAlias(state: SocketState, ctx: ExtensionContext): Promise<void> {
 	if (!state.server || !state.socketPath) return;
-	const alias = getSessionAlias(ctx);
-	if (alias && alias !== state.alias) {
-		await removeAliasesForSocket(state.socketPath);
+	const aliases = await getSessionAliases(ctx, state.aliases);
+	if (aliases.length === state.aliases.length && aliases.every((alias, index) => alias === state.aliases[index])) return;
+
+	await removeAliasesForSocket(state.socketPath);
+	for (const alias of aliases) {
 		await createAliasSymlink(ctx.sessionManager.getSessionId(), alias);
-		state.alias = alias;
-		return;
 	}
-	if (!alias && state.alias) {
-		await removeAliasesForSocket(state.socketPath);
-		state.alias = null;
-	}
+	state.aliases = aliases;
 }
 
 // ============================================================================
@@ -245,7 +256,7 @@ async function startControlServer(pi: ExtensionAPI, state: SocketState, ctx: Ext
 			if (state.context) void syncAlias(state, state.context);
 		},
 	);
-	state.alias = null;
+	state.aliases = [];
 	await syncAlias(state, ctx);
 }
 
@@ -254,7 +265,7 @@ async function stopControlServer(state: SocketState): Promise<void> {
 		await removeAliasesForSocket(state.socketPath);
 		await removeSocket(state.socketPath);
 		state.socketPath = null;
-		state.alias = null;
+		state.aliases = [];
 		return;
 	}
 
@@ -265,7 +276,7 @@ async function stopControlServer(state: SocketState): Promise<void> {
 	state.server = null;
 	await removeAliasesForSocket(socketPath);
 	await removeSocket(socketPath);
-	state.alias = null;
+	state.aliases = [];
 }
 
 function startAliasTimer(state: SocketState): void {
@@ -315,7 +326,7 @@ export function createSocketState(): SocketState {
 		server: null,
 		socketPath: null,
 		context: null,
-		alias: null,
+		aliases: [],
 		aliasTimer: null,
 		turnEndSubscriptions: [],
 	};

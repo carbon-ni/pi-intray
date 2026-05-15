@@ -62,6 +62,13 @@ export async function resolveSessionIdFromAlias(alias: string): Promise<string |
 	} catch { return null; }
 }
 
+export async function getAliasNames(): Promise<string[]> {
+	const entries = await fs.readdir(CONTROL_DIR, { withFileTypes: true });
+	return entries
+		.filter((entry) => entry.isSymbolicLink() && entry.name.endsWith(".alias"))
+		.map((entry) => entry.name.slice(0, -".alias".length));
+}
+
 export async function getAliasMap(): Promise<Map<string, string[]>> {
 	const aliasMap = new Map<string, string[]>();
 	const entries = await fs.readdir(CONTROL_DIR, { withFileTypes: true });

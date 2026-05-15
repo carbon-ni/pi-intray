@@ -1,15 +1,17 @@
 ---
-name: lsp-extension-explainer
+name: pi-intray
 description: >
-  Explain what a Pi extension does and how to use it through LSP-first codebase exploration.
-  Use when user asks chat-style questions like "what is this extension about?", "how do I use this extension?", "explore this extension", or "help me understand this Pi extension".
-  Do NOT use for code edits, CI debugging, commits, or generic non-extension repo summaries.
+  Explain and operate the Pi intray extension: session discovery, send_to_session, list_sessions,
+  branch aliases, and inter-agent communication through intray sockets.
+  Use when user asks how to communicate with another Pi agent/session, find main/branch sessions,
+  use intray, or understand this extension.
+  Do NOT use for unrelated Pi extensions, CI debugging, commits, or generic repo summaries.
 ---
 
-# LSP Extension Explainer
+# Pi Intray
 
 ## Objective
-Answer: what the extension does, where behavior lives, and how a user runs it.
+Answer: how Pi agents discover each other, target sessions, and exchange messages through intray.
 
 ## Workflow
 1. Start broad with LSP:
@@ -24,6 +26,7 @@ Answer: what the extension does, where behavior lives, and how a user runs it.
 3. Map extension surface:
    - registered flags
    - registered tools
+   - session targeting aliases, including `/name` aliases and git branch aliases such as `branch-main-1`
    - lifecycle hooks/events
    - external protocols or storage paths
 4. Trace important symbols with LSP before explaining:
@@ -34,6 +37,7 @@ Answer: what the extension does, where behavior lives, and how a user runs it.
    - one-line purpose
    - user-facing capabilities
    - exact usage commands
+   - how another agent discovers and targets sessions with `list_sessions` + `send_to_session`
    - key files for maintainers
    - limitations/unknowns if any
 6. Write a short report under `.tmp/reports/<dd-mm-yy>/` when working in a repo.
@@ -46,6 +50,9 @@ Answer: what the extension does, where behavior lives, and how a user runs it.
 
 ## Trigger examples
 Should trigger:
+- "How do I send a message to another Pi session?"
+- "Find the main agent session"
+- "Use intray to communicate with branch-main-1"
 - "Explore this extension with LSP; what is it about and how do I use it?"
 - "What does this Pi extension do?"
 - "Help me understand this extension"

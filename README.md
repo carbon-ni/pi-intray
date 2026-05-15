@@ -24,10 +24,17 @@ One-shot send:
 
 ```bash
 pi -p --in \
-  --control-session <session-name-or-id> \
+  --control-session <session-name-or-id-or-alias> \
   --send-session-message "please summarize your state" \
   --send-session-wait turn_end
 ```
+
+Sessions are discoverable by aliases:
+
+- `/name` session aliases, when set.
+- git branch aliases, assigned sequentially per branch, e.g. `branch-main-1`, `branch-main-2`.
+
+Use `list_sessions` or `/intray-sessions` to find the alias, then target it with `send_to_session.sessionName` or `--control-session`.
 
 Inside Pi, the extension adds:
 

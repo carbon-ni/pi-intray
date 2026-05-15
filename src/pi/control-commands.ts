@@ -5,7 +5,7 @@ import { isSessionControlRequested, parseSessionControlAction, type SessionContr
 type ControlState = {
 	server: unknown | null;
 	socketPath: string | null;
-	alias: string | null;
+	aliases: string[];
 };
 
 type ControlCommandDeps = {
@@ -30,7 +30,7 @@ export function registerSessionControlCommand(pi: ExtensionAPI, state: ControlSt
 
 			if (parsed.action === "start") {
 				await deps.enableControlServer(pi, state, ctx);
-				const label = state.alias ? ` (${state.alias})` : "";
+				const label = state.aliases.length > 0 ? ` (${state.aliases.join(", ")})` : "";
 				if (ctx.hasUI) ctx.ui.notify(`Intray started: ${ctx.sessionManager.getSessionId()}${label}`, "info");
 				return;
 			}
@@ -71,9 +71,9 @@ export function registerControlSessionsCommand(pi: ExtensionAPI, state: ControlS
 			const sessions = await getLiveSessions();
 			const currentSessionId = ctx.sessionManager.getSessionId();
 			const lines = sessions.map((session) => {
-				const name = session.name ? ` (${session.name})` : "";
+				const aliases = session.aliases.length > 0 ? ` (${session.aliases.join(", ")})` : "";
 				const current = session.sessionId === currentSessionId ? " (current)" : "";
-				return `- ${session.sessionId}${name}${current}`;
+				return `- ${session.sessionId}${aliases}${current}`;
 			});
 			const content = sessions.length === 0
 				? "No live sessions found."
