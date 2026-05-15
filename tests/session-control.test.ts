@@ -32,6 +32,11 @@ test("parseCommand rejects missing command type", () => {
 	assert.equal(result.error, "Missing command type");
 });
 
+test("parseCommand rejects non-object JSON values", () => {
+	assert.deepEqual(parseCommand("null"), { error: "Invalid command" });
+	assert.deepEqual(parseCommand('"send"'), { error: "Invalid command" });
+});
+
 test("session ids and aliases reject path traversal", () => {
 	assert.equal(isSafeSessionId("abc-123"), true);
 	assert.equal(isSafeSessionId(""), false);
