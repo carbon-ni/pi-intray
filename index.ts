@@ -54,85 +54,19 @@ import { complete, type Model, type Api, type UserMessage, type TextContent } fr
 import { StringEnum } from "@mariozechner/pi-ai";
 import { Box, Container, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
 import { Type } from "@sinclair/typebox";
-import { promises as fs } from "node:fs";
 import * as net from "node:net";
-import * as os from "node:os";
-import * as path from "node:path";
+import { getSocketPath } from "./src/infra/session-control-paths.ts";
+import { createAliasSymlink, ensureControlDir, getLiveSessions, isSocketAlive, removeAliasesForSocket, removeSocket, resolveSessionIdFromAlias } from "./src/infra/control-store.ts";
+import { CONTROL_FLAG, CONTROL_SHORT_FLAG, isSafeAlias, isSafeSessionId, isSessionControlRequested, normalizeMode, normalizeWaitUntil, parseCommand, parseSessionControlAction, type SessionControlAction, type RpcCommand, type RpcEvent, type RpcResponse, type RpcSubscribeCommand, type RpcSendCommand } from "./src/domain/index.ts";
+export { isSafeAlias, isSafeSessionId, isSessionControlRequested, normalizeMode, normalizeWaitUntil, parseCommand, parseSessionControlAction } from "./src/domain/index.ts";
 
-const CONTROL_FLAG = "session-control";
-const CONTROL_SHORT_FLAG = "sc";
 const CONTROL_TARGET_FLAG = "control-session";
 const CONTROL_SEND_MESSAGE_FLAG = "send-session-message";
 const CONTROL_SEND_MODE_FLAG = "send-session-mode";
 const CONTROL_SEND_WAIT_FLAG = "send-session-wait";
 const CONTROL_SEND_INCLUDE_SENDER_FLAG = "send-session-include-sender-info";
-const CONTROL_DIR = path.join(os.homedir(), ".pi", "session-control");
-const SOCKET_SUFFIX = ".sock";
 const SESSION_MESSAGE_TYPE = "session-message";
 const SENDER_INFO_PATTERN = /<sender_info>[\s\S]*?<\/sender_info>/g;
-
-// ============================================================================
-// RPC Types
-// ============================================================================
-
-interface RpcResponse {
-	type: "response";
-	command: string;
-	success: boolean;
-	error?: string;
-	data?: unknown;
-	id?: string;
-}
-
-interface RpcEvent {
-	type: "event";
-	event: string;
-	data?: unknown;
-	subscriptionId?: string;
-}
-
-// Unified command structure
-interface RpcSendCommand {
-	type: "send";
-	message: string;
-	mode?: "steer" | "follow_up";
-	id?: string;
-}
-
-interface RpcGetMessageCommand {
-	type: "get_message";
-	id?: string;
-}
-
-interface RpcGetSummaryCommand {
-	type: "get_summary";
-	id?: string;
-}
-
-interface RpcClearCommand {
-	type: "clear";
-	summarize?: boolean;
-	id?: string;
-}
-
-interface RpcAbortCommand {
-	type: "abort";
-	id?: string;
-}
-
-interface RpcSubscribeCommand {
-	type: "subscribe";
-	event: "turn_end";
-	id?: string;
-}
-
-type RpcCommand =
-	| RpcSendCommand
-	| RpcGetMessageCommand
-	| RpcGetSummaryCommand
-	| RpcClearCommand
-	| RpcAbortCommand
-	| RpcSubscribeCommand;
 
 // ============================================================================
 // Subscription Management
@@ -195,185 +129,11 @@ async function selectSummarizationModel(
 
 const STATUS_KEY = "session-control";
 
-function isErrnoException(error: unknown): error is NodeJS.ErrnoException {
-	return typeof error === "object" && error !== null && "code" in error;
-}
-
-function getSocketPath(sessionId: string): string {
-	return path.join(CONTROL_DIR, `${sessionId}${SOCKET_SUFFIX}`);
-}
-
-export function isSafeSessionId(sessionId: string): boolean {
-	return !sessionId.includes("/") && !sessionId.includes("\\") && !sessionId.includes("..") && sessionId.length > 0;
-}
-
-export function isSafeAlias(alias: string): boolean {
-	return !alias.includes("/") && !alias.includes("\\") && !alias.includes("..") && alias.length > 0;
-}
-
-function getAliasPath(alias: string): string {
-	return path.join(CONTROL_DIR, `${alias}.alias`);
-}
-
 function getSessionAlias(ctx: ExtensionContext): string | null {
 	const sessionName = ctx.sessionManager.getSessionName();
 	const alias = sessionName ? sessionName.trim() : "";
 	if (!alias || !isSafeAlias(alias)) return null;
 	return alias;
-}
-
-async function ensureControlDir(): Promise<void> {
-	await fs.mkdir(CONTROL_DIR, { recursive: true });
-}
-
-async function removeSocket(socketPath: string | null): Promise<void> {
-	if (!socketPath) return;
-	try {
-		await fs.unlink(socketPath);
-	} catch (error) {
-		if (isErrnoException(error) && error.code !== "ENOENT") {
-			throw error;
-		}
-	}
-}
-
-// TODO: add GC for stale sockets/aliases older than 7 days.
-async function removeAliasesForSocket(socketPath: string | null): Promise<void> {
-	if (!socketPath) return;
-	try {
-		const entries = await fs.readdir(CONTROL_DIR, { withFileTypes: true });
-		for (const entry of entries) {
-			if (!entry.isSymbolicLink()) continue;
-			const aliasPath = path.join(CONTROL_DIR, entry.name);
-			let target: string;
-			try {
-				target = await fs.readlink(aliasPath);
-			} catch {
-				continue;
-			}
-			const resolvedTarget = path.resolve(CONTROL_DIR, target);
-			if (resolvedTarget === socketPath) {
-				await fs.unlink(aliasPath);
-			}
-		}
-	} catch (error) {
-		if (isErrnoException(error) && error.code === "ENOENT") return;
-		throw error;
-	}
-}
-
-async function createAliasSymlink(sessionId: string, alias: string): Promise<void> {
-	if (!alias || !isSafeAlias(alias)) return;
-	const aliasPath = getAliasPath(alias);
-	const target = `${sessionId}${SOCKET_SUFFIX}`;
-	try {
-		await fs.unlink(aliasPath);
-	} catch (error) {
-		if (isErrnoException(error) && error.code !== "ENOENT") {
-			throw error;
-		}
-	}
-	try {
-		await fs.symlink(target, aliasPath);
-	} catch (error) {
-		if (isErrnoException(error) && error.code !== "EEXIST") {
-			throw error;
-		}
-	}
-}
-
-async function resolveSessionIdFromAlias(alias: string): Promise<string | null> {
-	if (!alias || !isSafeAlias(alias)) return null;
-	const aliasPath = getAliasPath(alias);
-	try {
-		const target = await fs.readlink(aliasPath);
-		const resolvedTarget = path.resolve(CONTROL_DIR, target);
-		const base = path.basename(resolvedTarget);
-		if (!base.endsWith(SOCKET_SUFFIX)) return null;
-		const sessionId = base.slice(0, -SOCKET_SUFFIX.length);
-		return isSafeSessionId(sessionId) ? sessionId : null;
-	} catch (error) {
-		if (isErrnoException(error) && error.code === "ENOENT") return null;
-		return null;
-	}
-}
-
-async function getAliasMap(): Promise<Map<string, string[]>> {
-	const aliasMap = new Map<string, string[]>();
-	const entries = await fs.readdir(CONTROL_DIR, { withFileTypes: true });
-	for (const entry of entries) {
-		if (!entry.isSymbolicLink()) continue;
-		if (!entry.name.endsWith(".alias")) continue;
-		const aliasPath = path.join(CONTROL_DIR, entry.name);
-		let target: string;
-		try {
-			target = await fs.readlink(aliasPath);
-		} catch {
-			continue;
-		}
-		const resolvedTarget = path.resolve(CONTROL_DIR, target);
-		const aliases = aliasMap.get(resolvedTarget);
-		const aliasName = entry.name.slice(0, -".alias".length);
-		if (aliases) {
-			aliases.push(aliasName);
-		} else {
-			aliasMap.set(resolvedTarget, [aliasName]);
-		}
-	}
-	return aliasMap;
-}
-
-async function isSocketAlive(socketPath: string): Promise<boolean> {
-	return await new Promise((resolve) => {
-		const socket = net.createConnection(socketPath);
-		const timeout = setTimeout(() => {
-			socket.destroy();
-			resolve(false);
-		}, 300);
-
-		const cleanup = (alive: boolean) => {
-			clearTimeout(timeout);
-			socket.removeAllListeners();
-			resolve(alive);
-		};
-
-		socket.once("connect", () => {
-			socket.end();
-			cleanup(true);
-		});
-		socket.once("error", () => {
-			cleanup(false);
-		});
-	});
-}
-
-type LiveSessionInfo = {
-	sessionId: string;
-	name?: string;
-	aliases: string[];
-	socketPath: string;
-};
-
-async function getLiveSessions(): Promise<LiveSessionInfo[]> {
-	await ensureControlDir();
-	const entries = await fs.readdir(CONTROL_DIR, { withFileTypes: true });
-	const aliasMap = await getAliasMap();
-	const sessions: LiveSessionInfo[] = [];
-
-	for (const entry of entries) {
-		if (!entry.name.endsWith(SOCKET_SUFFIX)) continue;
-		const socketPath = path.join(CONTROL_DIR, entry.name);
-		const alive = await isSocketAlive(socketPath);
-		if (!alive) continue;
-		const sessionId = entry.name.slice(0, -SOCKET_SUFFIX.length);
-		if (!isSafeSessionId(sessionId)) continue;
-		const aliases = aliasMap.get(socketPath) ?? [];
-		const name = aliases[0];
-		sessions.push({ sessionId, name, aliases, socketPath });
-	}
-
-	sessions.sort((a, b) => (a.name ?? a.sessionId).localeCompare(b.name ?? b.sessionId));
-	return sessions;
 }
 
 async function syncAlias(state: SocketState, ctx: ExtensionContext): Promise<void> {
@@ -404,21 +164,6 @@ function writeEvent(socket: net.Socket, event: RpcEvent): void {
 		socket.write(`${JSON.stringify(event)}\n`);
 	} catch {
 		// Socket may be closed
-	}
-}
-
-export function parseCommand(line: string): { command?: RpcCommand; error?: string } {
-	try {
-		const parsed = JSON.parse(line) as RpcCommand;
-		if (!parsed || typeof parsed !== "object") {
-			return { error: "Invalid command" };
-		}
-		if (typeof parsed.type !== "string") {
-			return { error: "Missing command type" };
-		}
-		return { command: parsed };
-	} catch (error) {
-		return { error: error instanceof Error ? error.message : "Failed to parse command" };
 	}
 }
 
@@ -998,16 +743,6 @@ function updateSessionEnv(ctx: ExtensionContext | null, enabled: boolean): void 
 
 // Extension factories run before extension flag values are hydrated into runtime.flagValues,
 // so we inspect argv directly when deciding whether to register tools at load time.
-export function isSessionControlRequested(
-	getFlag: (name: string) => unknown,
-	argv: string[] = process.argv.slice(2),
-): boolean {
-	return getFlag(CONTROL_FLAG) === true
-		|| getFlag(CONTROL_SHORT_FLAG) === true
-		|| argv.includes(`--${CONTROL_FLAG}`)
-		|| argv.includes(`--${CONTROL_SHORT_FLAG}`);
-}
-
 function shouldRegisterControlTools(pi: ExtensionAPI): boolean {
 	return isSessionControlRequested((name) => pi.getFlag(name));
 }
@@ -1550,20 +1285,6 @@ function registerListSessionsTool(pi: ExtensionAPI): void {
 	});
 }
 
-type SessionControlAction = "start" | "stop" | "status";
-
-export function parseSessionControlAction(args: string): { action?: SessionControlAction; error?: string } {
-	const parts = args.trim().split(/\s+/).filter(Boolean);
-	if (parts.length === 0) return { action: "status" };
-	if (parts.length > 1) return { error: "Too many arguments. Use /session-control start|stop|status." };
-
-	const action = parts[0] as SessionControlAction;
-	if (action === "start" || action === "stop" || action === "status") {
-		return { action };
-	}
-	return { error: `Unknown session-control action: ${parts[0]}. Use start|stop|status.` };
-}
-
 type StartupControlSendOptions = {
 	target: string;
 	message: string;
@@ -1571,20 +1292,6 @@ type StartupControlSendOptions = {
 	waitUntil?: "turn_end" | "message_processed";
 	includeSenderInfo: boolean;
 };
-
-export function normalizeMode(raw: string): "steer" | "follow_up" | null {
-	const value = raw.trim().toLowerCase();
-	if (value === "steer") return "steer";
-	if (value === "follow_up" || value === "follow-up" || value === "followup") return "follow_up";
-	return null;
-}
-
-export function normalizeWaitUntil(raw: string): "turn_end" | "message_processed" | null {
-	const value = raw.trim().toLowerCase();
-	if (value === "turn_end" || value === "turn-end") return "turn_end";
-	if (value === "message_processed" || value === "message-processed") return "message_processed";
-	return null;
-}
 
 function getStringFlag(pi: ExtensionAPI, name: string): string | undefined {
 	const value = pi.getFlag(name);

@@ -9,7 +9,7 @@ import {
 	isSessionControlRequested,
 	parseCommand,
 	parseSessionControlAction,
-} from "../index.ts";
+} from "../src/domain/index.ts";
 
 test("parseCommand accepts valid send command", () => {
 	const result = parseCommand(JSON.stringify({ type: "send", message: "hello", mode: "steer" }));
