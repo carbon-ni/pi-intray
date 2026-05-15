@@ -26,7 +26,7 @@ Answer: how Pi agents discover each other, target sessions, and exchange message
 3. Map extension surface:
    - registered flags
    - registered tools
-   - session targeting aliases, including `/name` aliases and git branch aliases such as `branch-main-1`
+   - session targeting aliases, including `/name` aliases and project+branch aliases such as `intra-pi-intray-branch-main-1`
    - lifecycle hooks/events
    - external protocols or storage paths
 4. Trace important symbols with LSP before explaining:
@@ -52,7 +52,7 @@ Answer: how Pi agents discover each other, target sessions, and exchange message
 Should trigger:
 - "How do I send a message to another Pi session?"
 - "Find the main agent session"
-- "Use intray to communicate with branch-main-1"
+- "Use intray to communicate with intra-pi-intray-branch-main-1"
 - "Explore this extension with LSP; what is it about and how do I use it?"
 - "What does this Pi extension do?"
 - "Help me understand this extension"

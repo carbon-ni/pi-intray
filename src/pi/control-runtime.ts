@@ -1,11 +1,11 @@
 import type { ExtensionAPI, ExtensionContext, TurnEndEvent } from "@mariozechner/pi-coding-agent";
 import { getSocketPath } from "../infra/intray-paths.ts";
 import { createAliasSymlink, ensureControlDir, getAliasNames, removeAliasesForSocket, removeSocket } from "../infra/control-store.ts";
-import { getCurrentGitBranch } from "../infra/git-branch.ts";
+import { getCurrentGitBranch, getGitProjectName } from "../infra/git-branch.ts";
 import { closeRpcServer, createRpcServer, writeEvent, writeResponse, type RpcServer, type RpcSocket } from "../infra/rpc-server.ts";
 import { updateProcessSessionEnv } from "../infra/session-env.ts";
 import { selectSummarizationModel, summarizeConversation } from "../infra/summarizer.ts";
-import { createBranchAlias, createSequentialBranchAlias, getFirstEntryId, getLastAssistantMessage, getMessagesSinceLastPrompt, isSafeAlias, type RpcCommand, SESSION_MESSAGE_TYPE } from "../domain/index.ts";
+import { createProjectBranchAlias, createSequentialProjectBranchAlias, getFirstEntryId, getLastAssistantMessage, getMessagesSinceLastPrompt, isSafeAlias, type RpcCommand, SESSION_MESSAGE_TYPE } from "../domain/index.ts";
 
 // ============================================================================
 // Subscription Management
@@ -43,11 +43,11 @@ function getSessionAlias(ctx: ExtensionContext): string | null {
 }
 
 async function getBranchAlias(currentAliases: string[]): Promise<string | null> {
-	const branch = await getCurrentGitBranch();
-	const baseAlias = branch ? createBranchAlias(branch) : null;
-	if (!branch || !baseAlias) return null;
+	const [branch, project] = await Promise.all([getCurrentGitBranch(), getGitProjectName()]);
+	const baseAlias = branch && project ? createProjectBranchAlias(project, branch) : null;
+	if (!branch || !project || !baseAlias) return null;
 	const currentAlias = currentAliases.find((alias) => alias.startsWith(`${baseAlias}-`));
-	return createSequentialBranchAlias(branch, await getAliasNames(), currentAlias);
+	return createSequentialProjectBranchAlias(project, branch, await getAliasNames(), currentAlias);
 }
 
 async function getSessionAliases(ctx: ExtensionContext, currentAliases: string[]): Promise<string[]> {

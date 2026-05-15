@@ -29,7 +29,7 @@ Actions:
 
 Target selection:
 - sessionId: UUID of the session.
-- sessionName: session name (alias from /name) or branch alias shown by list_sessions, e.g. branch-main-1.
+- sessionName: session name (alias from /name) or project+branch alias shown by list_sessions, e.g. intra-pi-intray-branch-main-1.
 
 Wait behavior (only for action=send):
 - wait_until=turn_end: Wait for the turn to complete, returns last assistant message.

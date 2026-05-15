@@ -32,7 +32,7 @@ pi -p --in \
 Sessions are discoverable by aliases:
 
 - `/name` session aliases, when set.
-- git branch aliases, assigned sequentially per branch, e.g. `branch-main-1`, `branch-main-2`.
+- project + git branch aliases, assigned sequentially, e.g. `intra-pi-intray-branch-main-1`, `intra-pi-intray-branch-main-2`.
 
 Use `list_sessions` or `/intray-sessions` to find the alias, then target it with `send_to_session.sessionName` or `--control-session`.
 
