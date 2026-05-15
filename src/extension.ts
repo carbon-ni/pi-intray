@@ -57,11 +57,12 @@ import * as net from "node:net";
 import { getSocketPath } from "./infra/session-control-paths.ts";
 import { createAliasSymlink, ensureControlDir, getLiveSessions, isSocketAlive, removeAliasesForSocket, removeSocket, resolveSessionIdFromAlias } from "./infra/control-store.ts";
 import { sendRpcCommand } from "./infra/rpc-client.ts";
+import { createRpcServer, writeEvent, writeResponse } from "./infra/rpc-server.ts";
 import { renderSessionMessage } from "./pi/message-renderer.ts";
 import { registerListSessionsTool } from "./pi/list-sessions-tool.ts";
 import { maybeHandleStartupControlSend } from "./pi/startup-send.ts";
 import { registerControlSessionsCommand, registerSessionControlCommand } from "./pi/control-commands.ts";
-import { CONTROL_FLAG, CONTROL_SHORT_FLAG, isSafeAlias, isSafeSessionId, isSessionControlRequested, normalizeMode, normalizeWaitUntil, parseCommand, parseSessionControlAction, type SessionControlAction, type RpcCommand, type RpcEvent, type RpcResponse, type RpcSubscribeCommand, type RpcSendCommand, type ExtractedMessage } from "./domain/index.ts";
+import { CONTROL_FLAG, CONTROL_SHORT_FLAG, isSafeAlias, isSafeSessionId, isSessionControlRequested, normalizeMode, normalizeWaitUntil, parseSessionControlAction, type SessionControlAction, type RpcCommand, type RpcSendCommand, type ExtractedMessage } from "./domain/index.ts";
 export { isSafeAlias, isSafeSessionId, isSessionControlRequested, normalizeMode, normalizeWaitUntil, parseCommand, parseSessionControlAction } from "./domain/index.ts";
 
 const CONTROL_TARGET_FLAG = "control-session";
@@ -151,22 +152,6 @@ async function syncAlias(state: SocketState, ctx: ExtensionContext): Promise<voi
 	if (!alias && state.alias) {
 		await removeAliasesForSocket(state.socketPath);
 		state.alias = null;
-	}
-}
-
-function writeResponse(socket: net.Socket, response: RpcResponse): void {
-	try {
-		socket.write(`${JSON.stringify(response)}\n`);
-	} catch {
-		// Socket may be closed
-	}
-}
-
-function writeEvent(socket: net.Socket, event: RpcEvent): void {
-	try {
-		socket.write(`${JSON.stringify(event)}\n`);
-	} catch {
-		// Socket may be closed
 	}
 }
 
@@ -434,50 +419,6 @@ async function handleCommand(
 // Server Management
 // ============================================================================
 
-async function createServer(pi: ExtensionAPI, state: SocketState, socketPath: string): Promise<net.Server> {
-	const server = net.createServer((socket) => {
-		socket.setEncoding("utf8");
-		let buffer = "";
-		socket.on("data", (chunk) => {
-			buffer += chunk;
-			let newlineIndex = buffer.indexOf("\n");
-			while (newlineIndex !== -1) {
-				const line = buffer.slice(0, newlineIndex).trim();
-				buffer = buffer.slice(newlineIndex + 1);
-				newlineIndex = buffer.indexOf("\n");
-				if (!line) continue;
-
-				const parsed = parseCommand(line);
-				if (parsed.error) {
-					if (state.context) {
-						void syncAlias(state, state.context);
-					}
-					writeResponse(socket, {
-						type: "response",
-						command: "parse",
-						success: false,
-						error: `Failed to parse command: ${parsed.error}`,
-					});
-					continue;
-				}
-
-				handleCommand(pi, state, parsed.command!, socket);
-			}
-		});
-	});
-
-	// Wait for server to start listening, with error handling
-	await new Promise<void>((resolve, reject) => {
-		server.once("error", reject);
-		server.listen(socketPath, () => {
-			server.removeListener("error", reject);
-			resolve();
-		});
-	});
-
-	return server;
-}
-
 async function startControlServer(pi: ExtensionAPI, state: SocketState, ctx: ExtensionContext): Promise<void> {
 	await ensureControlDir();
 	const sessionId = ctx.sessionManager.getSessionId();
@@ -494,7 +435,13 @@ async function startControlServer(pi: ExtensionAPI, state: SocketState, ctx: Ext
 
 	state.context = ctx;
 	state.socketPath = socketPath;
-	state.server = await createServer(pi, state, socketPath);
+	state.server = await createRpcServer(
+		socketPath,
+		(command, socket) => handleCommand(pi, state, command, socket),
+		() => {
+			if (state.context) void syncAlias(state, state.context);
+		},
+	);
 	state.alias = null;
 	await syncAlias(state, ctx);
 }
