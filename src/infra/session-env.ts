@@ -1,14 +1,13 @@
-type SessionEnv = Record<string, string | undefined>;
-
-export function updateSessionEnvValue(env: SessionEnv, enabled: boolean, sessionId?: string): void {
-	if (!enabled) {
-		delete env.PI_SESSION_ID;
-		return;
-	}
-	if (!sessionId) return;
-	env.PI_SESSION_ID = sessionId;
+export function getSessionEnvValue(enabled: boolean, sessionId?: string): string | undefined {
+	if (!enabled) return undefined;
+	return sessionId;
 }
 
 export function updateProcessSessionEnv(enabled: boolean, sessionId?: string): void {
-	updateSessionEnvValue(process.env, enabled, sessionId);
+	const value = getSessionEnvValue(enabled, sessionId);
+	if (value) {
+		process.env.PI_SESSION_ID = value;
+		return;
+	}
+	delete process.env.PI_SESSION_ID;
 }

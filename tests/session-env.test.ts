@@ -1,28 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { updateSessionEnvValue } from "../src/infra/session-env.ts";
+import { getSessionEnvValue } from "../src/infra/session-env.ts";
 
-test("updateSessionEnvValue sets session id when enabled", () => {
-	const env: Record<string, string | undefined> = {};
-
-	updateSessionEnvValue(env, true, "session-1");
-
-	assert.equal(env.PI_SESSION_ID, "session-1");
+test("getSessionEnvValue returns session id when enabled", () => {
+	assert.equal(getSessionEnvValue(true, "session-1"), "session-1");
 });
 
-test("updateSessionEnvValue removes session id when disabled", () => {
-	const env: Record<string, string | undefined> = { PI_SESSION_ID: "session-1" };
-
-	updateSessionEnvValue(env, false, "session-1");
-
-	assert.equal("PI_SESSION_ID" in env, false);
+test("getSessionEnvValue returns undefined when disabled", () => {
+	assert.equal(getSessionEnvValue(false, "session-1"), undefined);
 });
 
-test("updateSessionEnvValue leaves env unchanged when enabled without session id", () => {
-	const env: Record<string, string | undefined> = {};
-
-	updateSessionEnvValue(env, true);
-
-	assert.deepEqual(env, {});
+test("getSessionEnvValue returns undefined when enabled without session id", () => {
+	assert.equal(getSessionEnvValue(true), undefined);
 });
