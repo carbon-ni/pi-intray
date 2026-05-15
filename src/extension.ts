@@ -58,6 +58,7 @@ import { getSocketPath } from "./infra/session-control-paths.ts";
 import { createAliasSymlink, ensureControlDir, getLiveSessions, isSocketAlive, removeAliasesForSocket, removeSocket, resolveSessionIdFromAlias } from "./infra/control-store.ts";
 import { sendRpcCommand } from "./infra/rpc-client.ts";
 import { createRpcServer, writeEvent, writeResponse } from "./infra/rpc-server.ts";
+import { updateProcessSessionEnv } from "./infra/session-env.ts";
 import { renderSessionMessage } from "./pi/message-renderer.ts";
 import { registerListSessionsTool } from "./pi/list-sessions-tool.ts";
 import { maybeHandleStartupControlSend } from "./pi/startup-send.ts";
@@ -432,12 +433,7 @@ function updateStatus(ctx: ExtensionContext | null, enabled: boolean): void {
 }
 
 function updateSessionEnv(ctx: ExtensionContext | null, enabled: boolean): void {
-	if (!enabled) {
-		delete process.env.PI_SESSION_ID;
-		return;
-	}
-	if (!ctx) return;
-	process.env.PI_SESSION_ID = ctx.sessionManager.getSessionId();
+	updateProcessSessionEnv(enabled, ctx?.sessionManager.getSessionId());
 }
 
 // Extension factories run before extension flag values are hydrated into runtime.flagValues,
