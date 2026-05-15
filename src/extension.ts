@@ -47,10 +47,9 @@ import type {
 	ExtensionContext,
 } from "@mariozechner/pi-coding-agent";
 import { renderSessionMessage } from "./pi/message-renderer.ts";
-import { registerListSessionsTool } from "./pi/list-sessions-tool.ts";
 import { maybeHandleStartupControlSend } from "./pi/startup-send.ts";
 import { registerControlSessionsCommand, registerSessionControlCommand } from "./pi/control-commands.ts";
-import { registerSessionTool } from "./pi/session-tool.ts";
+import { registerListSessionsTool, registerSessionTool } from "./tools/index.ts";
 import { createSocketState, disableControlServer, emitTurnEnd, enableControlServer } from "./pi/control-runtime.ts";
 import { CONTROL_FLAG, CONTROL_SHORT_FLAG, isSafeAlias, isSafeSessionId, isSessionControlRequested, normalizeMode, normalizeWaitUntil, parseSessionControlAction, SESSION_MESSAGE_TYPE } from "./domain/index.ts";
 export { isSafeAlias, isSafeSessionId, isSessionControlRequested, normalizeMode, normalizeWaitUntil, parseCommand, parseSessionControlAction } from "./domain/index.ts";
