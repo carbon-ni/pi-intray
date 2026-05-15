@@ -62,7 +62,7 @@ import { renderSessionMessage } from "./pi/message-renderer.ts";
 import { registerListSessionsTool } from "./pi/list-sessions-tool.ts";
 import { maybeHandleStartupControlSend } from "./pi/startup-send.ts";
 import { registerControlSessionsCommand, registerSessionControlCommand } from "./pi/control-commands.ts";
-import { CONTROL_FLAG, CONTROL_SHORT_FLAG, isSafeAlias, isSafeSessionId, isSessionControlRequested, normalizeMode, normalizeWaitUntil, parseSessionControlAction, type SessionControlAction, type RpcCommand, type RpcSendCommand, type ExtractedMessage } from "./domain/index.ts";
+import { CONTROL_FLAG, CONTROL_SHORT_FLAG, getFirstEntryId, getLastAssistantMessage, getMessagesSinceLastPrompt, isSafeAlias, isSafeSessionId, isSessionControlRequested, normalizeMode, normalizeWaitUntil, parseSessionControlAction, type SessionControlAction, type RpcCommand, type RpcSendCommand, type ExtractedMessage } from "./domain/index.ts";
 export { isSafeAlias, isSafeSessionId, isSessionControlRequested, normalizeMode, normalizeWaitUntil, parseCommand, parseSessionControlAction } from "./domain/index.ts";
 
 const CONTROL_TARGET_FLAG = "control-session";
@@ -156,78 +156,6 @@ async function syncAlias(state: SocketState, ctx: ExtensionContext): Promise<voi
 }
 
 // ============================================================================
-// Message Extraction
-// ============================================================================
-
-function getLastAssistantMessage(ctx: ExtensionContext): ExtractedMessage | undefined {
-	const branch = ctx.sessionManager.getBranch();
-
-	for (let i = branch.length - 1; i >= 0; i--) {
-		const entry = branch[i];
-		if (entry.type === "message") {
-			const msg = entry.message;
-			if ("role" in msg && msg.role === "assistant") {
-				const textParts = (Array.isArray(msg.content) ? msg.content : [])
-					.filter((c: unknown): c is { type: "text"; text: string } => typeof c === "object" && c !== null && (c as { type?: string }).type === "text")
-					.map((c) => c.text);
-				if (textParts.length > 0) {
-					return {
-						role: "assistant",
-						content: textParts.join("\n"),
-						timestamp: msg.timestamp,
-					};
-				}
-			}
-		}
-	}
-	return undefined;
-}
-
-function getMessagesSinceLastPrompt(ctx: ExtensionContext): ExtractedMessage[] {
-	const branch = ctx.sessionManager.getBranch();
-	const messages: ExtractedMessage[] = [];
-
-	let lastUserIndex = -1;
-	for (let i = branch.length - 1; i >= 0; i--) {
-		const entry = branch[i];
-		if (entry.type === "message" && "role" in entry.message && entry.message.role === "user") {
-			lastUserIndex = i;
-			break;
-		}
-	}
-
-	if (lastUserIndex === -1) return [];
-
-	for (let i = lastUserIndex; i < branch.length; i++) {
-		const entry = branch[i];
-		if (entry.type === "message") {
-			const msg = entry.message;
-			if ("role" in msg && (msg.role === "user" || msg.role === "assistant")) {
-				const textParts = (Array.isArray(msg.content) ? msg.content : [])
-					.filter((c: unknown): c is { type: "text"; text: string } => typeof c === "object" && c !== null && (c as { type?: string }).type === "text")
-					.map((c) => c.text);
-				if (textParts.length > 0) {
-					messages.push({
-						role: msg.role,
-						content: textParts.join("\n"),
-						timestamp: msg.timestamp,
-					});
-				}
-			}
-		}
-	}
-
-	return messages;
-}
-
-function getFirstEntryId(ctx: ExtensionContext): string | undefined {
-	const entries = ctx.sessionManager.getEntries();
-	if (entries.length === 0) return undefined;
-	const root = entries.find((e) => e.parentId === null);
-	return root?.id ?? entries[0]?.id;
-}
-
-// ============================================================================
 // Command Handlers
 // ============================================================================
 
@@ -282,7 +210,7 @@ async function handleCommand(
 
 	// Get last message
 	if (command.type === "get_message") {
-		const message = getLastAssistantMessage(ctx);
+		const message = getLastAssistantMessage(ctx.sessionManager.getBranch());
 		if (!message) {
 			respond(true, "get_message", { message: null });
 			return;
@@ -293,7 +221,7 @@ async function handleCommand(
 
 	// Get summary
 	if (command.type === "get_summary") {
-		const messages = getMessagesSinceLastPrompt(ctx);
+		const messages = getMessagesSinceLastPrompt(ctx.sessionManager.getBranch());
 		if (messages.length === 0) {
 			respond(false, "get_summary", undefined, "No messages to summarize");
 			return;
@@ -352,7 +280,7 @@ async function handleCommand(
 			return;
 		}
 
-		const firstEntryId = getFirstEntryId(ctx);
+		const firstEntryId = getFirstEntryId(ctx.sessionManager.getEntries());
 		if (!firstEntryId) {
 			respond(false, "clear", undefined, "No entries in session");
 			return;
@@ -604,7 +532,7 @@ export default function (pi: ExtensionAPI) {
 		if (state.turnEndSubscriptions.length === 0) return;
 
 		void syncAlias(state, ctx);
-		const lastMessage = getLastAssistantMessage(ctx);
+		const lastMessage = getLastAssistantMessage(ctx.sessionManager.getBranch());
 		const eventData = { message: lastMessage, turnIndex: event.turnIndex };
 
 		// Fire to all subscribers (one-shot)
