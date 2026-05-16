@@ -55,7 +55,7 @@ CLI bridge (for shell scripts/background jobs):
 
 Note: If you ask the target session to reply back via sender_info, do not use wait_until; waiting is redundant and can duplicate responses.
 
-Messages automatically include sender session info for replies. When you want a response, instruct the target session to reply directly to the sender by calling send_to_session with the sender_info reference (do not poll get_message).`,
+Messages include sender session info for replies by default. For final acknowledgements like "OK thanks", set include_sender_info=false so the recipient cannot reply back and the conversation ends. When you want a response, instruct the target session to reply directly to the sender by calling send_to_session with the sender_info reference (do not poll get_message).`,
 		parameters: Type.Object({
 			sessionId: Type.Optional(Type.String({ description: "Target session id (UUID)" })),
 			sessionName: Type.Optional(Type.String({ description: "Target session name (alias)" })),
@@ -77,6 +77,10 @@ Messages automatically include sender session info for replies. When you want a 
 					description: "Wait behavior for send action",
 				}),
 			),
+			include_sender_info: Type.Optional(Type.Boolean({
+				description: "Include reply instructions and sender_info. Set false for final acknowledgements like 'OK thanks' to end the exchange.",
+				default: true,
+			})),
 		}),
 		async execute(_toolCallId, params, _signal, _onUpdate, _ctx) {
 			const action = params.action ?? "send";
@@ -198,9 +202,10 @@ Messages automatically include sender session info for replies. When you want a 
 				}
 
 				const senderSessionName = state.context?.sessionManager.getSessionName()?.trim();
+				const includeSenderInfo = params.include_sender_info !== false;
 				const message = appendReplyInstruction(
 					params.message,
-					senderSessionId
+					includeSenderInfo && senderSessionId
 						? {
 							sessionId: senderSessionId,
 							sessionName: senderSessionName || undefined,
