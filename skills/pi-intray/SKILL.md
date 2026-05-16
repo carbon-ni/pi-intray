@@ -42,6 +42,13 @@ Answer: how Pi agents discover each other, target sessions, and exchange message
    - limitations/unknowns if any
 6. Write a short report under `.tmp/reports/<dd-mm-yy>/` when working in a repo.
 
+## Agent-to-agent usage
+- Discover targets first: `list_sessions()`.
+- Ask a synchronous question with `send_to_session({ sessionName, message, wait_until: "turn_end" })`.
+- Ask asynchronously with `mode: "follow_up"` and `wait_until: "message_processed"`; later fetch via `action: "get_message"`.
+- Prefer session names/aliases over raw IDs when available.
+- If the target should answer back later, mention that sender info is attached and ask it to reply to sender.
+
 ## Guardrails
 - Prefer LSP tools before grep/read exploration.
 - Do not dump large code blocks.
