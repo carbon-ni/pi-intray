@@ -55,16 +55,27 @@ async function getSessionAliases(ctx: ExtensionContext, currentAliases: string[]
 	return Array.from(new Set(aliases));
 }
 
+function isStaleContextError(error: unknown): boolean {
+	return error instanceof Error && error.message.includes("This extension ctx is stale");
+}
+
 async function syncAlias(state: SocketState, ctx: ExtensionContext): Promise<void> {
 	if (!state.server || !state.socketPath) return;
-	const aliases = await getSessionAliases(ctx, state.aliases);
-	if (aliases.length === state.aliases.length && aliases.every((alias, index) => alias === state.aliases[index])) return;
 
-	await removeAliasesForSocket(state.socketPath);
-	for (const alias of aliases) {
-		await createAliasSymlink(ctx.sessionManager.getSessionId(), alias);
+	try {
+		const aliases = await getSessionAliases(ctx, state.aliases);
+		if (aliases.length === state.aliases.length && aliases.every((alias, index) => alias === state.aliases[index])) return;
+
+		const sessionId = ctx.sessionManager.getSessionId();
+		await removeAliasesForSocket(state.socketPath);
+		for (const alias of aliases) {
+			await createAliasSymlink(sessionId, alias);
+		}
+		state.aliases = aliases;
+	} catch (error) {
+		if (!isStaleContextError(error)) throw error;
+		if (state.context === ctx) state.context = null;
 	}
-	state.aliases = aliases;
 }
 
 // ============================================================================
