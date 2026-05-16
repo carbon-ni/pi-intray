@@ -45,9 +45,13 @@ Answer: how Pi agents discover each other, target sessions, and exchange message
 ## Agent-to-agent usage
 - Discover targets first: `list_sessions()`.
 - Ask a synchronous question with `send_to_session({ sessionName, message, wait_until: "turn_end" })`.
-- Ask asynchronously with `mode: "follow_up"` and `wait_until: "message_processed"`; later fetch via `action: "get_message"`.
+- Ask asynchronously with `send_to_session({ sessionName, message, wait_until: "message_processed" })`.
 - Prefer session names/aliases over raw IDs when available.
-- If the target should answer back later, mention that sender info is attached and ask it to reply to sender.
+- `send_to_session` automatically appends `<reply_instruction>` and `<sender_info>{"sessionId":"...","sessionName":"..."}</sender_info>` when the sender session is known.
+- For async delegation, tell the receiver what to do and rely on the built-in reply instruction; the receiver should answer by calling `send_to_session` with `sessionId: sender_info.sessionId`.
+- Use `wait_until: "message_processed"` for async callback workflows; this returns after delivery and does not halt until the target answer.
+- Use `wait_until: "turn_end"` only when the sender wants to block until the receiver completes its turn and returns the last assistant message.
+- Avoid combining `wait_until: "turn_end"` with explicit reply-back instructions; it can duplicate responses.
 
 ## Guardrails
 - Prefer LSP tools before grep/read exploration.

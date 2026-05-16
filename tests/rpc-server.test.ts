@@ -5,8 +5,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import net from "node:net";
 
-import { createRpcServer } from "../src/infra/rpc-server.ts";
+import { closeRpcServer, createRpcServer, writeEvent, writeResponse } from "../src/infra/rpc-server.ts";
 import type { RpcCommand } from "../src/domain/index.ts";
+import type { RpcSocket } from "../src/infra/rpc-server.ts";
 
 async function withSocketServer(run: (socketPath: string) => Promise<void>): Promise<void> {
 	const dir = await mkdtemp(path.join(tmpdir(), "intray-rpc-server-"));
@@ -48,7 +49,7 @@ test("createRpcServer dispatches parsed commands to handler", async () => {
 			assert.deepEqual(received, { type: "get_message" });
 			assert.deepEqual(JSON.parse(response), { type: "response", command: "get_message", success: true });
 		} finally {
-			server.close();
+			await closeRpcServer(server);
 		}
 	});
 });
@@ -74,7 +75,33 @@ test("createRpcServer returns parse errors without dispatching invalid commands"
 			assert.equal(JSON.parse(response).success, false);
 			assert.equal(JSON.parse(response).command, "parse");
 		} finally {
-			server.close();
+			await closeRpcServer(server);
 		}
 	});
+});
+
+test("writeResponse ignores closed socket write errors", () => {
+	const socket = {
+		write() {
+			throw new Error("closed");
+		},
+		once() {
+			return socket;
+		},
+	} as unknown as RpcSocket;
+
+	assert.doesNotThrow(() => writeResponse(socket, { type: "response", command: "send", success: true }));
+});
+
+test("writeEvent ignores closed socket write errors", () => {
+	const socket = {
+		write() {
+			throw new Error("closed");
+		},
+		once() {
+			return socket;
+		},
+	} as unknown as RpcSocket;
+
+	assert.doesNotThrow(() => writeEvent(socket, { type: "event", event: "turn_end", data: { message: "done" } }));
 });
