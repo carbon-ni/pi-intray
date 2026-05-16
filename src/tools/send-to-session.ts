@@ -5,7 +5,7 @@ import { Type } from "@sinclair/typebox";
 import { getSocketPath } from "../infra/intray-paths.ts";
 import { resolveSessionIdFromAlias } from "../infra/control-store.ts";
 import { sendRpcCommand } from "../infra/rpc-client.ts";
-import { isSafeSessionId, type ExtractedMessage, type RpcSendCommand } from "../domain/index.ts";
+import { appendReplyInstruction, isSafeSessionId, type ExtractedMessage, type RpcSendCommand } from "../domain/index.ts";
 
 export interface SessionToolState {
 	context: ExtensionContext | null;
@@ -198,16 +198,19 @@ Messages automatically include sender session info for replies. When you want a 
 				}
 
 				const senderSessionName = state.context?.sessionManager.getSessionName()?.trim();
-				const senderInfo = senderSessionId
-					? `\n\n<sender_info>${JSON.stringify({
-						sessionId: senderSessionId,
-						sessionName: senderSessionName || undefined,
-					})}</sender_info>`
-					: "";
+				const message = appendReplyInstruction(
+					params.message,
+					senderSessionId
+						? {
+							sessionId: senderSessionId,
+							sessionName: senderSessionName || undefined,
+						}
+						: null,
+				);
 
 				const sendCommand: RpcSendCommand = {
 					type: "send",
-					message: params.message + senderInfo,
+					message,
 					mode: params.mode ?? "steer",
 				};
 
