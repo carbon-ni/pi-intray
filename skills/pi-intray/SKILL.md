@@ -54,6 +54,11 @@ Answer: how Pi agents discover each other, target sessions, and exchange message
 - Avoid combining `wait_until: "turn_end"` with explicit reply-back instructions; it can duplicate responses.
 - If the target should answer back later, mention that sender info is attached and ask it to reply to sender.
 - End agent-to-agent acknowledgement loops explicitly with `reply_behavior: "end_conversation"`; this omits `sender_info` so the recipient has no typed reply path. Do not rely on phrase detection like "OK thanks".
+- `send_to_session` automatically appends `<reply_instruction>` and `<sender_info>{"sessionId":"...","sessionName":"..."}</sender_info>` when the sender session is known.
+- For async delegation, tell the receiver what to do and rely on the built-in reply instruction; the receiver should answer by calling `send_to_session` with `sessionId: sender_info.sessionId`.
+- Use `wait_until: "message_processed"` for async callback workflows; this returns after delivery and does not halt until the target answer.
+- Use `wait_until: "turn_end"` only when the sender wants to block until the receiver completes its turn and returns the last assistant message.
+- Avoid combining `wait_until: "turn_end"` with explicit reply-back instructions; it can duplicate responses.
 
 ## Guardrails
 - Prefer LSP tools before grep/read exploration.
