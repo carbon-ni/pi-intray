@@ -56,7 +56,7 @@ async function getSessionAliases(ctx: ExtensionContext, currentAliases: string[]
 }
 
 function isStaleContextError(error: unknown): boolean {
-	return error instanceof Error && error.message.includes("This extension ctx is stale");
+	return String(error instanceof Error ? error.message : error).includes("This extension ctx is stale");
 }
 
 async function syncAlias(state: SocketState, ctx: ExtensionContext): Promise<void> {
@@ -319,17 +319,25 @@ export async function disableControlServer(state: SocketState, ctx: ExtensionCon
 }
 
 function updateStatus(ctx: ExtensionContext | null, enabled: boolean): void {
-	if (!ctx?.hasUI) return;
-	if (!enabled) {
-		ctx.ui.setStatus(STATUS_KEY, undefined);
-		return;
+	try {
+		if (!ctx?.hasUI) return;
+		if (!enabled) {
+			ctx.ui.setStatus(STATUS_KEY, undefined);
+			return;
+		}
+		const sessionId = ctx.sessionManager.getSessionId();
+		ctx.ui.setStatus(STATUS_KEY, ctx.ui.theme.fg("dim", `session ${sessionId}`));
+	} catch (error) {
+		if (!isStaleContextError(error)) throw error;
 	}
-	const sessionId = ctx.sessionManager.getSessionId();
-	ctx.ui.setStatus(STATUS_KEY, ctx.ui.theme.fg("dim", `session ${sessionId}`));
 }
 
 function updateSessionEnv(ctx: ExtensionContext | null, enabled: boolean): void {
-	updateProcessSessionEnv(enabled, ctx?.sessionManager.getSessionId());
+	try {
+		updateProcessSessionEnv(enabled, ctx?.sessionManager.getSessionId());
+	} catch (error) {
+		if (!isStaleContextError(error)) throw error;
+	}
 }
 
 export function createSocketState(): SocketState {
