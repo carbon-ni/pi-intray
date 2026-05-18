@@ -46,4 +46,9 @@ Commit subjects use one canonical convention enforced by `.githooks/commit-msg`:
 
 Allowed types: `feat`, `fix`, `docs`, `test`, `chore`, `refactor`.
 
+Local lifecycle gates:
+
+- pre-commit: `npm run lint` and `npm test`.
+- pre-push/CI: `make all`.
+
 Do not add competing command paths without updating `Makefile`, hooks, CI, and docs together.
