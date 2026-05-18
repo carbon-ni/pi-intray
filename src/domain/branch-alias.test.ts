@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createBranchAlias, createSequentialBranchAlias } from "../src/domain/index.ts";
-import { getCurrentGitBranch } from "../src/infra/git-branch.ts";
+import { createBranchAlias, createSequentialBranchAlias } from "./index.ts";
+import { getCurrentGitBranch } from "../infra/git-branch.ts";
 
 test("createBranchAlias turns git branch names into safe aliases", () => {
 	assert.equal(createBranchAlias("main"), "branch-main");

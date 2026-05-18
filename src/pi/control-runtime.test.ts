@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createSocketState, disableControlServer } from "../src/pi/control-runtime.ts";
+import { createSocketState, disableControlServer } from "./control-runtime.ts";
 
 function createThrowingContext(message: string): unknown {
 	return {

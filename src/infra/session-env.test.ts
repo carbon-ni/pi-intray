@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { getSessionEnvValue, updateProcessSessionEnv } from "../src/infra/session-env.ts";
+import { getSessionEnvValue, updateProcessSessionEnv } from "./session-env.ts";
 
 test("getSessionEnvValue returns session id when enabled", () => {
 	assert.equal(getSessionEnvValue(true, "session-1"), "session-1");

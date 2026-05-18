@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { createProjectBranchAlias, createSequentialProjectBranchAlias } from "../src/domain/index.ts";
-import { getGitProjectName } from "../src/infra/git-branch.ts";
+import { createProjectBranchAlias, createSequentialProjectBranchAlias } from "./index.ts";
+import { getGitProjectName } from "../infra/git-branch.ts";
 
 test("createProjectBranchAlias includes project and branch", () => {
 	assert.equal(createProjectBranchAlias("pi-intray", "main"), "intra-pi-intray-branch-main");

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { appendReplyInstruction } from "../src/domain/index.ts";
+import { appendReplyInstruction } from "./index.ts";
 
 test("appendReplyInstruction leaves message unchanged without sender info", () => {
 	assert.equal(appendReplyInstruction("hello", null), "hello");

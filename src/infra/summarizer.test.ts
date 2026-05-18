@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { selectSummarizationModel, summarizeConversation, type CompletionFn } from "../src/infra/summarizer.ts";
+import { selectSummarizationModel, summarizeConversation, type CompletionFn } from "./summarizer.ts";
 
 test("selectSummarizationModel prefers authenticated codex model", async () => {
 	const currentModel = { id: "current" } as any;

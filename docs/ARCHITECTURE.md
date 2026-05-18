@@ -8,7 +8,7 @@
 - `src/infra/` — socket, filesystem, git, environment, model, and other dependency boundaries.
 - `src/pi/` — Pi extension commands, renderers, hooks, and runtime glue.
 - `src/tools/` — Pi tool registrations (`list_sessions`, `send_to_session`).
-- `tests/` — deterministic `node:test` coverage for domain behavior and runtime seams.
+- `src/**/*.test.ts` — colocated deterministic `node:test` coverage for domain behavior and runtime seams.
 - `.githooks/` — versioned local hooks aligned with `Makefile` gates.
 - `.github/workflows/` — CI gate that runs the same local command path.
 

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { getFirstEntryId, getLastAssistantMessage, getMessagesSinceLastPrompt } from "../src/domain/session-messages.ts";
+import { getFirstEntryId, getLastAssistantMessage, getMessagesSinceLastPrompt } from "./session-messages.ts";
 
 const text = (value: string) => ({ type: "text", text: value });
 

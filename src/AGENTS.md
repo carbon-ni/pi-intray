@@ -1,29 +1,27 @@
-# src Guide
+# Source Guide
 
-`src/` is split by responsibility, not by technical accident.
+## Tests
 
-## Folder responsibilities
+Tests use Node's built-in test runner through `tsx` and are colocated with the behavior they cover as `*.test.ts`.
 
-- `domain/`: pure rules and data transformations.
-- `infra/`: side effects and external dependencies.
-- `pi/`: Pi runtime integration and lifecycle glue.
-- `tools/`: registered tools, one module per tool.
-- `extension.ts`: composition root only.
+## Commands
 
-## Dependency direction
+- `npm test`
+- `npm run test:coverage`
 
-Allowed:
+## Style
 
-```txt
-extension.ts -> tools/pi/infra/domain
-tools      -> pi/infra/domain
-pi         -> infra/domain
-infra      -> domain
-domain     -> nothing project-specific
+- Deterministic tests only.
+- Prefer testing pure `src/domain/*` functions directly.
+- For external behavior, test focused `src/infra/*` adapters with temp dirs/sockets.
+- Keep Pi runtime tests at seams; avoid brittle UI/render assertions unless behavior requires it.
+
+## Before commits
+
+Run:
+
+```sh
+npm run lint
+npm test
+npm run test:coverage
 ```
-
-Avoid reverse imports. Especially: `domain/` must not import `infra/`, `pi/`, or `tools/`.
-
-## Before editing
-
-Read the nested `AGENTS.md` in the target folder.
