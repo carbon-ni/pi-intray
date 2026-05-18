@@ -1,83 +1,135 @@
 ---
 name: pi-intray
 description: >
-  Explain and operate the Pi intray extension: session discovery, send_to_session, list_sessions,
-  branch aliases, and inter-agent communication through intray sockets.
-  Use when user asks how to communicate with another Pi agent/session, find main/branch sessions,
-  use intray, or understand this extension.
-  Do NOT use for unrelated Pi extensions, CI debugging, commits, or generic repo summaries.
+  Use the pi-intray extension to chat with another running Pi session.
+  Use when user asks to message, talk to, coordinate with, ping, or ask another Pi agent/session.
+  Triggers: "send a message to another session", "ask the other agent", "talk to the other pi", "ping that session", "coordinate with another agent".
+  Works with pi-intray tools and flags: list_sessions, send_to_session, and pi --in.
+  Do NOT use for generic chat, non-Pi messaging, or explaining unrelated Pi extensions.
 ---
 
-# Pi Intray
+# Pi Intray Chat
 
-## Objective
-Answer: how Pi agents discover each other, target sessions, and exchange messages through intray.
+Objective: communicate with another running Pi session through the pi-intray extension.
 
-## Workflow
-1. Start broad with LSP:
-   - `code_document_symbols` on `src/extension.ts` or main entrypoint.
-   - `code_public_api` on entrypoint and nearby exported modules.
-   - `code_workspace_symbols` for obvious domain words from package/README.
-2. Read only grounding docs/files:
-   - `README.md`
-   - `package.json`
-   - extension entrypoint
-   - key tool/command/runtime files found via LSP
-3. Map extension surface:
-   - registered flags
-   - registered tools
-   - session targeting aliases, including `/name` aliases and project+branch aliases such as `intra-pi-intray-branch-main-1`
-   - lifecycle hooks/events
-   - external protocols or storage paths
-4. Trace important symbols with LSP before explaining:
-   - `code_symbol_info` for registrations and core functions.
-   - `code_call_graph` outgoing depth 1-2 for entrypoint behavior.
-   - `code_references` only when ownership/usage is unclear.
-5. Produce concise answer:
-   - one-line purpose
-   - user-facing capabilities
-   - exact usage commands
-   - how another agent discovers and targets sessions with `list_sessions` + `send_to_session`
-   - key files for maintainers
-   - limitations/unknowns if any
-6. Write a short report under `.tmp/reports/<dd-mm-yy>/` when working in a repo.
+## Required setup
 
-## Agent-to-agent usage
-- Discover targets first: `list_sessions()`.
-- Ask a synchronous question with `send_to_session({ sessionName, message, wait_until: "turn_end" })`.
-- Ask asynchronously with `send_to_session({ sessionName, message, wait_until: "message_processed" })`.
-- Prefer session names/aliases over raw IDs when available.
-- `send_to_session` automatically appends `<reply_instruction>` and `<sender_info>{"sessionId":"...","sessionName":"..."}</sender_info>` when the sender session is known.
-- For async delegation, tell the receiver what to do and rely on the built-in reply instruction; the receiver should answer by calling `send_to_session` with `sessionId: sender_info.sessionId`.
-- Use `wait_until: "message_processed"` for async callback workflows; this returns after delivery and does not halt until the target answer.
-- Use `wait_until: "turn_end"` only when the sender wants to block until the receiver completes its turn and returns the last assistant message.
-- Avoid combining `wait_until: "turn_end"` with explicit reply-back instructions; it can duplicate responses.
-- If the target should answer back later, mention that sender info is attached and ask it to reply to sender.
-- End agent-to-agent acknowledgement loops explicitly with `reply_behavior: "end_conversation"`; this omits `sender_info` so the recipient has no typed reply path. Do not rely on phrase detection like "OK thanks".
-- `send_to_session` automatically appends `<reply_instruction>` and `<sender_info>{"sessionId":"...","sessionName":"..."}</sender_info>` when the sender session is known.
-- For async delegation, tell the receiver what to do and rely on the built-in reply instruction; the receiver should answer by calling `send_to_session` with `sessionId: sender_info.sessionId`.
-- Use `wait_until: "message_processed"` for async callback workflows; this returns after delivery and does not halt until the target answer.
-- Use `wait_until: "turn_end"` only when the sender wants to block until the receiver completes its turn and returns the last assistant message.
-- Avoid combining `wait_until: "turn_end"` with explicit reply-back instructions; it can duplicate responses.
+1. Receiver session must be running with intray enabled:
+   ```bash
+   pi --in
+   # same as: pi --intray
+   ```
+2. If current session needs to receive replies, it also must run with `--in`.
+
+## Discover sessions
+
+Prefer built-in discovery before guessing targets:
+
+1. As an agent, call `list_sessions`.
+2. Target by one of:
+   - `sessionId`
+   - configured session alias
+   - project/branch alias shown by discovery, e.g. `intra-pi-intray-branch-main-1`
+
+Inside shell commands, current session id is available as:
+
+```bash
+$PI_SESSION_ID
+```
+
+Use it for the current session; do not call `list_sessions` only to discover yourself.
+
+## Send as agent
+
+Use `send_to_session`:
+
+```json
+{
+  "sessionName": "<alias-or-branch-alias>",
+  "message": "<message>",
+  "mode": "steer"
+}
+```
+
+Wait for a response when needed:
+
+```json
+{
+  "sessionName": "<target>",
+  "message": "Please summarize your current task.",
+  "wait_until": "turn_end"
+}
+```
+
+Use default `reply_behavior: "allow_reply"` for continuous agent-to-agent chat. This appends `<sender_info>` and a reply instruction so the recipient can answer by calling `send_to_session` back to the sender.
+
+Use `reply_behavior: "end_conversation"` for final acknowledgements to avoid reply loops.
+
+## Continuous chat pattern
+
+1. Both sessions start with `pi --in`.
+2. First agent discovers peers with `list_sessions`.
+3. First agent sends with default `reply_behavior` or explicit `"allow_reply"`.
+4. Recipient sees `<sender_info>{"sessionId":"..."}</sender_info>` in the message.
+5. Recipient replies by calling `send_to_session` with that `sessionId`.
+6. Continue until done; final reply should set `reply_behavior: "end_conversation"`.
+
+Example first message:
+
+```json
+{
+  "sessionName": "worker",
+  "message": "Can you inspect the failing test and tell me what you find?",
+  "mode": "steer",
+  "reply_behavior": "allow_reply"
+}
+```
+
+Example reply from recipient:
+
+```json
+{
+  "sessionId": "<sender_info.sessionId>",
+  "message": "I found the failing assertion. It expects alias sorting, but output preserves creation order.",
+  "mode": "follow_up",
+  "reply_behavior": "allow_reply"
+}
+```
+
+Final acknowledgement:
+
+```json
+{
+  "sessionId": "<sender_info.sessionId>",
+  "message": "Done, thanks.",
+  "reply_behavior": "end_conversation"
+}
+```
+
+## Send from CLI
+
+One-way message:
+
+```bash
+pi -p --in \
+  --control-session "<target>" \
+  --send-session-message "hello" \
+  --send-session-mode follow_up \
+  --send-session-wait message_processed
+```
+
+Request/response:
+
+```bash
+pi -p --in \
+  --control-session "<target>" \
+  --send-session-message "please summarize your state" \
+  --send-session-wait turn_end
+```
 
 ## Guardrails
-- Prefer LSP tools before grep/read exploration.
-- Do not dump large code blocks.
-- Verify usage against README/package/entrypoint, not assumptions.
-- Keep final answer user-facing; keep implementation map short.
 
-## Trigger examples
-Should trigger:
-- "How do I send a message to another Pi session?"
-- "Find the main agent session"
-- "Use intray to communicate with intra-pi-intray-branch-main-1"
-- "Explore this extension with LSP; what is it about and how do I use it?"
-- "What does this Pi extension do?"
-- "Help me understand this extension"
-- "How do I run this extension?"
-
-Should not trigger:
-- "Fix this extension bug"
-- "Review this PR"
-- "Commit these changes"
-- "Debug CI for this repo"
+- Do not assume a session is available; discover first.
+- If discovery returns none, tell user target sessions must start with `pi --in`.
+- Use `follow_up` for non-urgent updates; use `steer` for immediate interruption.
+- Avoid both `wait_until` and explicit reply instructions unless necessary; it can duplicate responses.
