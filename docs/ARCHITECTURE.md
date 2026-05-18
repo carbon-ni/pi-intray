@@ -35,4 +35,15 @@ Canonical project configuration lives in:
 - `Makefile` for operator quality gates.
 - `.githooks/` and `.github/workflows/ci.yml` for enforcement.
 
+## Commit messages
+
+Commit subjects use one canonical convention enforced by `.githooks/commit-msg`:
+
+```text
+<type>: <summary>
+<type>(<scope>): <summary>
+```
+
+Allowed types: `feat`, `fix`, `docs`, `test`, `chore`, `refactor`.
+
 Do not add competing command paths without updating `Makefile`, hooks, CI, and docs together.
