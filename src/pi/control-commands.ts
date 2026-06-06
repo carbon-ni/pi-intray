@@ -1,6 +1,6 @@
 import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { getLiveSessions } from "../infra/control-store.ts";
-import { isSessionControlRequested, parseSessionControlAction, type SessionControlAction } from "../domain/index.ts";
+import { filterSessionsBySearch, isSessionControlRequested, parseSessionControlAction, type SessionControlAction } from "../domain/index.ts";
 
 type ControlState = {
 	server: unknown | null;
@@ -59,8 +59,8 @@ export function registerSessionControlCommand(pi: ExtensionAPI, state: ControlSt
 
 export function registerControlSessionsCommand(pi: ExtensionAPI, state: ControlState): void {
 	pi.registerCommand("intray-sessions", {
-		description: "List controllable sessions (from intray sockets)",
-		handler: async (_args, ctx) => {
+		description: "List controllable sessions (from intray sockets). Optionally pass search text to filter by id, name, or alias.",
+		handler: async (args, ctx) => {
 			if (!isSessionControlRequested((name) => pi.getFlag(name)) && !state.server) {
 				if (ctx.hasUI) {
 					ctx.ui.notify("Intray not enabled (use /intray start or --intray)", "warning");
@@ -68,7 +68,8 @@ export function registerControlSessionsCommand(pi: ExtensionAPI, state: ControlS
 				return;
 			}
 
-			const sessions = await getLiveSessions();
+			const search = args.trim();
+			const sessions = filterSessionsBySearch(await getLiveSessions(), search);
 			const currentSessionId = ctx.sessionManager.getSessionId();
 			const lines = sessions.map((session) => {
 				const aliases = session.aliases.length > 0 ? ` (${session.aliases.join(", ")})` : "";
@@ -76,8 +77,8 @@ export function registerControlSessionsCommand(pi: ExtensionAPI, state: ControlS
 				return `- ${session.sessionId}${aliases}${current}`;
 			});
 			const content = sessions.length === 0
-				? "No live sessions found."
-				: `Controllable sessions:\n${lines.join("\n")}`;
+				? (search ? `No live sessions found matching "${search}".` : "No live sessions found.")
+				: `${search ? `Controllable sessions matching "${search}"` : "Controllable sessions"}:\n${lines.join("\n")}`;
 
 			pi.sendMessage(
 				{

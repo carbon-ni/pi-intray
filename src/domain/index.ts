@@ -5,3 +5,4 @@ export * from "./messages.ts";
 export * from "./session-messages.ts";
 export * from "./branch-alias.ts";
 export * from "./reply-instruction.ts";
+export * from "./session-filter.ts";

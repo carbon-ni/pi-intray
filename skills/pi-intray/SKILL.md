@@ -4,7 +4,7 @@ description: >
   Use the pi-intray extension to chat with another running Pi session.
   Use when user asks to message, talk to, coordinate with, ping, or ask another Pi agent/session.
   Triggers: "send a message to another session", "ask the other agent", "talk to the other pi", "ping that session", "coordinate with another agent".
-  Works with pi-intray tools and flags: list_sessions, send_to_session, and pi --in.
+  Works with pi-intray tools and flags: list_sessions (optionally filtered by search), send_to_session, and pi --in.
   Do NOT use for generic chat, non-Pi messaging, or explaining unrelated Pi extensions.
 ---
 
@@ -26,7 +26,12 @@ Objective: communicate with another running Pi session through the pi-intray ext
 Prefer built-in discovery before guessing targets:
 
 1. As an agent, call `list_sessions`.
-2. Target by one of:
+   - Use `search` when the user gives part of a session name/id/alias or when many sessions are live:
+     ```json
+     { "search": "pi-intray" }
+     ```
+2. In Pi UI, use `/intray-sessions` or `/intray-sessions <search>`.
+3. Target by one of:
    - `sessionId`
    - configured session alias
    - project/branch alias shown by discovery, e.g. `intra-pi-intray-branch-main-1`
@@ -38,6 +43,8 @@ $PI_SESSION_ID
 ```
 
 Use it for the current session; do not call `list_sessions` only to discover yourself.
+
+Search is case-insensitive and matches session id, session name, and aliases.
 
 ## Send as agent
 
