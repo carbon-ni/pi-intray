@@ -32,8 +32,9 @@ Target selection:
 - sessionName: session name (alias from /name) or project+branch alias shown by list_sessions, e.g. intra-pi-intray-branch-main-1.
 
 Wait behavior (only for action=send):
-- wait_until=turn_end: Wait for the turn to complete, returns last assistant message.
+- wait_until=turn_end: Wait for the turn to complete, returns last assistant message (default).
 - wait_until=message_processed: Returns immediately after message is queued.
+- wait_until=off: Do not wait for the target turn; only confirm delivery.
 
 CLI bridge (for shell scripts/background jobs):
 - Current session id is available in shell/bash as $PI_SESSION_ID (set when --intray is enabled).
@@ -73,8 +74,9 @@ Messages use reply_behavior="allow_reply" by default. For final acknowledgements
 				}),
 			),
 			wait_until: Type.Optional(
-				Type.Union([Type.Literal("turn_end"), Type.Literal("message_processed")], {
+				Type.Union([Type.Literal("turn_end"), Type.Literal("message_processed"), Type.Literal("off")], {
 					description: "Wait behavior for send action",
+					default: "turn_end",
 				}),
 			),
 			reply_behavior: Type.Optional(
@@ -222,7 +224,8 @@ Messages use reply_behavior="allow_reply" by default. For final acknowledgements
 				};
 
 				// Determine wait behavior
-				if (params.wait_until === "message_processed") {
+				const waitUntil = params.wait_until ?? "turn_end";
+				if (waitUntil === "message_processed" || waitUntil === "off") {
 					// Just send and confirm delivery
 					const result = await sendRpcCommand(socketPath, sendCommand);
 					if (!result.response.success) {
@@ -238,7 +241,7 @@ Messages use reply_behavior="allow_reply" by default. For final acknowledgements
 					};
 				}
 
-				if (params.wait_until === "turn_end") {
+				if (waitUntil === "turn_end") {
 					// Send and wait for turn to complete
 					const result = await sendRpcCommand(socketPath, sendCommand, {
 						timeout: 300000, // 5 minutes
@@ -303,7 +306,7 @@ Messages use reply_behavior="allow_reply" by default. For final acknowledgements
 			// Add action-specific info
 			if (action === "send") {
 				const mode = args.mode ?? "steer";
-				const wait = args.wait_until;
+				const wait = args.wait_until ?? "turn_end";
 				let info = theme.fg("muted", ` (${mode}`);
 				if (wait) info += theme.fg("dim", `, wait: ${wait}`);
 				info += theme.fg("muted", ")");

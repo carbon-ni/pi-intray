@@ -22,10 +22,13 @@ export function normalizeMode(raw: string): "steer" | "follow_up" | null {
 	return null;
 }
 
-export function normalizeWaitUntil(raw: string): "turn_end" | "message_processed" | null {
+export type WaitUntil = "turn_end" | "message_processed" | "off";
+
+export function normalizeWaitUntil(raw: string): WaitUntil | null {
 	const value = raw.trim().toLowerCase();
 	if (value === "turn_end" || value === "turn-end") return "turn_end";
 	if (value === "message_processed" || value === "message-processed") return "message_processed";
+	if (value === "off" || value === "none") return "off";
 	return null;
 }
 

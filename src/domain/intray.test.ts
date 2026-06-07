@@ -64,6 +64,8 @@ test("normalizeWaitUntil accepts documented aliases", () => {
 	assert.equal(normalizeWaitUntil("turn-end"), "turn_end");
 	assert.equal(normalizeWaitUntil(" message-processed "), "message_processed");
 	assert.equal(normalizeWaitUntil("message_processed"), "message_processed");
+	assert.equal(normalizeWaitUntil("off"), "off");
+	assert.equal(normalizeWaitUntil("none"), "off");
 	assert.equal(normalizeWaitUntil("done"), null);
 });
 

@@ -48,6 +48,8 @@ Inside Pi, the extension adds:
 Newline-delimited JSON over the session socket:
 
 - `{ "type": "send", "message": "...", "mode": "steer" | "follow_up" }`
+
+`send_to_session` waits for `turn_end` by default. Set `wait_until: "off"` to only confirm delivery.
 - `{ "type": "get_message" }`
 - `{ "type": "get_summary" }`
 - `{ "type": "clear", "summarize": true }`

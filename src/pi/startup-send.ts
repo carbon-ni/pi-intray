@@ -2,7 +2,7 @@ import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-age
 import { getSocketPath } from "../infra/intray-paths.ts";
 import { isSocketAlive, resolveSessionIdFromAlias } from "../infra/control-store.ts";
 import { sendRpcCommand } from "../infra/rpc-client.ts";
-import { isSafeSessionId, normalizeMode, normalizeWaitUntil, type RpcSendCommand } from "../domain/index.ts";
+import { isSafeSessionId, normalizeMode, normalizeWaitUntil, type RpcSendCommand, type WaitUntil } from "../domain/index.ts";
 
 export type StartupControlSendFlags = {
 	target: string;
@@ -16,7 +16,7 @@ type StartupControlSendOptions = {
 	target: string;
 	message: string;
 	mode: "steer" | "follow_up";
-	waitUntil?: "turn_end" | "message_processed";
+	waitUntil?: WaitUntil;
 	includeSenderInfo: boolean;
 };
 
@@ -48,12 +48,12 @@ function parseStartupControlSendOptions(pi: ExtensionAPI, flags: StartupControlS
 	}
 
 	const rawWait = getStringFlag(pi, flags.wait);
-	let waitUntil: "turn_end" | "message_processed" | undefined;
+	let waitUntil: WaitUntil | undefined;
 	if (rawWait) {
 		const normalized = normalizeWaitUntil(rawWait);
 		if (!normalized) {
 			return {
-				error: `Invalid --${flags.wait}: ${rawWait}. Use turn_end|message_processed.`,
+				error: `Invalid --${flags.wait}: ${rawWait}. Use turn_end|message_processed|off.`,
 			};
 		}
 		waitUntil = normalized;
