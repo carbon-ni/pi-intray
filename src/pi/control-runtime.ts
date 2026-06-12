@@ -4,8 +4,7 @@ import { createAliasSymlink, ensureControlDir, getAliasNames, removeAliasesForSo
 import { getCurrentGitBranch, getGitProjectName } from "../infra/git-branch.ts";
 import { closeRpcServer, createRpcServer, writeEvent, writeResponse, type RpcServer, type RpcSocket } from "../infra/rpc-server.ts";
 import { updateProcessSessionEnv } from "../infra/session-env.ts";
-import { selectSummarizationModel, summarizeConversation } from "../infra/summarizer.ts";
-import { createProjectBranchAlias, createSequentialProjectBranchAlias, getFirstEntryId, getLastAssistantMessage, getMessagesSinceLastPrompt, isSafeAlias, type RpcCommand, SESSION_MESSAGE_TYPE } from "../domain/index.ts";
+import { createProjectBranchAlias, createSequentialProjectBranchAlias, getFirstEntryId, getLastAssistantMessage, isSafeAlias, type RpcCommand, SESSION_MESSAGE_TYPE } from "../domain/index.ts";
 
 // ============================================================================
 // Subscription Management
@@ -24,10 +23,6 @@ export interface SocketState {
 	aliasTimer: ReturnType<typeof setInterval> | null;
 	turnEndSubscriptions: TurnEndSubscription[];
 }
-
-// ============================================================================
-// Summarization
-// ============================================================================
 
 // ============================================================================
 // Utilities
@@ -142,34 +137,6 @@ async function handleCommand(
 		return;
 	}
 
-	// Get summary
-	if (command.type === "get_summary") {
-		const messages = getMessagesSinceLastPrompt(ctx.sessionManager.getBranch());
-		if (messages.length === 0) {
-			respond(false, "get_summary", undefined, "No messages to summarize");
-			return;
-		}
-
-		const model = await selectSummarizationModel(ctx.model, ctx.modelRegistry);
-		if (!model) {
-			respond(false, "get_summary", undefined, "No model available for summarization");
-			return;
-		}
-
-		const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-		if (!auth.ok) {
-			respond(false, "get_summary", undefined, "Missing API key for summarization model");
-			return;
-		}
-
-		try {
-			respond(true, "get_summary", await summarizeConversation(messages, model, auth));
-		} catch (error) {
-			respond(false, "get_summary", undefined, error instanceof Error ? error.message : "Summarization failed");
-		}
-		return;
-	}
-
 	// Clear session
 	if (command.type === "clear") {
 		if (!ctx.isIdle()) {
@@ -186,14 +153,6 @@ async function handleCommand(
 		const currentLeafId = ctx.sessionManager.getLeafId();
 		if (currentLeafId === firstEntryId) {
 			respond(true, "clear", { cleared: true, alreadyAtRoot: true });
-			return;
-		}
-
-		if (command.summarize) {
-			// Summarization requires navigateTree which we don't have direct access to
-			// Return an error for now - the caller should clear without summarize
-			// or use a different approach
-			respond(false, "clear", undefined, "Clear with summarization not supported via RPC - use summarize=false");
 			return;
 		}
 

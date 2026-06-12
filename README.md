@@ -25,7 +25,7 @@ One-shot send:
 ```bash
 pi -p --in \
   --control-session <session-name-or-id-or-alias> \
-  --send-session-message "please summarize your state" \
+  --send-session-message "please report your state" \
   --send-session-wait turn_end
 ```
 
@@ -51,7 +51,6 @@ Newline-delimited JSON over the session socket:
 
 `send_to_session` waits for `turn_end` by default. Set `wait_until: "off"` to only confirm delivery.
 - `{ "type": "get_message" }`
-- `{ "type": "get_summary" }`
-- `{ "type": "clear", "summarize": true }`
+- `{ "type": "clear" }`
 - `{ "type": "abort" }`
 - `{ "type": "subscribe", "event": "turn_end" }`

@@ -9,7 +9,6 @@
  * - Send messages to other running pi sessions (steer or follow-up mode)
  *   via tool (`send_to_session`) or startup CLI flags (`--control-session`, `--send-session-message`)
  * - Retrieve the last assistant message from a session
- * - Get AI-generated summaries of session activity
  * - Clear/rewind sessions to their initial state
  * - Subscribe to turn_end events for async coordination
  *
@@ -33,8 +32,7 @@
  *   Commands are newline-delimited JSON objects with a `type` field:
  *   - { type: "send", message: "...", mode?: "steer"|"follow_up" }
  *   - { type: "get_message" }
- *   - { type: "get_summary" }
- *   - { type: "clear", summarize?: boolean }
+ *   - { type: "clear" }
  *   - { type: "abort" }
  *   - { type: "subscribe", event: "turn_end" }
  *

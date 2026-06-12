@@ -24,7 +24,6 @@ export function registerSessionTool(pi: ExtensionAPI, state: SessionToolState): 
 Actions:
 - send: Send a message (default). Requires 'message' parameter.
 - get_message: Get the most recent assistant message.
-- get_summary: Get a summary of activity since the last user prompt.
 - clear: Rewind session to initial state.
 
 Target selection:
@@ -61,7 +60,7 @@ Messages use reply_behavior="allow_reply" by default. For final acknowledgements
 			sessionId: Type.Optional(Type.String({ description: "Target session id (UUID)" })),
 			sessionName: Type.Optional(Type.String({ description: "Target session name (alias)" })),
 			action: Type.Optional(
-				Type.Union([Type.Literal("send"), Type.Literal("get_message"), Type.Literal("get_summary"), Type.Literal("clear")], {
+				Type.Union([Type.Literal("send"), Type.Literal("get_message"), Type.Literal("clear")], {
 					description: "Action to perform (default: send)",
 					default: "send",
 				}),
@@ -157,30 +156,8 @@ Messages use reply_behavior="allow_reply" by default. For final acknowledgements
 					};
 				}
 
-				if (action === "get_summary") {
-					const result = await sendRpcCommand(socketPath, { type: "get_summary" }, { timeout: 60000 });
-					if (!result.response.success) {
-						return {
-							content: [{ type: "text", text: `Failed: ${result.response.error ?? "unknown error"}` }],
-							isError: true,
-							details: result,
-						};
-					}
-					const data = result.response.data as { summary?: string; model?: string };
-					if (!data?.summary) {
-						return {
-							content: [{ type: "text", text: "No summary generated" }],
-							details: result,
-						};
-					}
-					return {
-						content: [{ type: "text", text: `Summary (via ${data.model}):\n\n${data.summary}` }],
-						details: { summary: data.summary, model: data.model },
-					};
-				}
-
 				if (action === "clear") {
-					const result = await sendRpcCommand(socketPath, { type: "clear", summarize: false }, { timeout: 10000 });
+					const result = await sendRpcCommand(socketPath, { type: "clear" }, { timeout: 10000 });
 					if (!result.response.success) {
 						return {
 							content: [{ type: "text", text: `Failed to clear: ${result.response.error ?? "unknown error"}` }],
@@ -344,7 +321,6 @@ Messages use reply_behavior="allow_reply" by default. For final acknowledgements
 
 			// Detect action from details structure
 			const hasMessage = details && "message" in details && details.message;
-			const hasSummary = details && "summary" in details;
 			const hasCleared = details && "cleared" in details;
 			const hasTurnIndex = details && "turnIndex" in details;
 
@@ -374,33 +350,6 @@ Messages use reply_behavior="allow_reply" by default. For final acknowledgements
 				if (hasTurnIndex) text += theme.fg("dim", ` (turn #${details.turnIndex})`);
 				text += "\n" + theme.fg("toolOutput", lines.join("\n"));
 				if (message.content.split("\n").length > 5 || message.content.length > 200) {
-					text += "\n" + theme.fg("dim", "(Ctrl+O to expand)");
-				}
-				return new Text(text, 0, 0);
-			}
-
-			// get_summary result
-			if (hasSummary) {
-				const summary = details.summary as string;
-				const model = details.model as string | undefined;
-				const icon = theme.fg("success", "✓");
-
-				if (expanded) {
-					const container = new Container();
-					let header = icon + theme.fg("muted", " Summary");
-					if (model) header += theme.fg("dim", ` via ${model}`);
-					container.addChild(new Text(header, 0, 0));
-					container.addChild(new Spacer(1));
-					container.addChild(new Markdown(summary, 0, 0, getMarkdownTheme()));
-					return container;
-				}
-
-				const preview = summary.length > 200 ? summary.slice(0, 200) + "..." : summary;
-				const lines = preview.split("\n").slice(0, 5);
-				let text = icon + theme.fg("muted", " Summary");
-				if (model) text += theme.fg("dim", ` via ${model}`);
-				text += "\n" + theme.fg("toolOutput", lines.join("\n"));
-				if (summary.split("\n").length > 5 || summary.length > 200) {
 					text += "\n" + theme.fg("dim", "(Ctrl+O to expand)");
 				}
 				return new Text(text, 0, 0);

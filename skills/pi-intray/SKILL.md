@@ -63,7 +63,7 @@ Wait for a response when needed:
 ```json
 {
   "sessionName": "<target>",
-  "message": "Please summarize your current task.",
+  "message": "Please report your current task and next step.",
   "wait_until": "turn_end"
 }
 ```
@@ -130,7 +130,7 @@ Request/response:
 ```bash
 pi -p --in \
   --control-session "<target>" \
-  --send-session-message "please summarize your state" \
+  --send-session-message "please report your state" \
   --send-session-wait turn_end
 ```
 

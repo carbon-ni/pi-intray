@@ -26,14 +26,8 @@ export interface RpcGetMessageCommand {
 	id?: string;
 }
 
-export interface RpcGetSummaryCommand {
-	type: "get_summary";
-	id?: string;
-}
-
 export interface RpcClearCommand {
 	type: "clear";
-	summarize?: boolean;
 	id?: string;
 }
 
@@ -51,7 +45,6 @@ export interface RpcSubscribeCommand {
 export type RpcCommand =
 	| RpcSendCommand
 	| RpcGetMessageCommand
-	| RpcGetSummaryCommand
 	| RpcClearCommand
 	| RpcAbortCommand
 	| RpcSubscribeCommand;
