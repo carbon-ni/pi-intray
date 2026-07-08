@@ -50,6 +50,7 @@ import { registerControlSessionsCommand, registerSessionControlCommand } from ".
 import { registerListSessionsTool, registerSessionTool } from "./tools/index.ts";
 import { createSocketState, disableControlServer, emitTurnEnd, enableControlServer } from "./pi/control-runtime.ts";
 import { CONTROL_FLAG, CONTROL_SHORT_FLAG, isSafeAlias, isSafeSessionId, isSessionControlRequested, normalizeMode, normalizeWaitUntil, parseSessionControlAction, SESSION_MESSAGE_TYPE } from "./domain/index.ts";
+import { isIntrayEnabledByConfig } from "./infra/intray-config.ts";
 export { isSafeAlias, isSafeSessionId, isSessionControlRequested, normalizeMode, normalizeWaitUntil, parseCommand, parseSessionControlAction } from "./domain/index.ts";
 
 const CONTROL_TARGET_FLAG = "control-session";
@@ -60,7 +61,7 @@ const CONTROL_SEND_INCLUDE_SENDER_FLAG = "send-session-include-sender-info";
 // Extension factories run before extension flag values are hydrated into runtime.flagValues,
 // so we inspect argv directly when deciding whether to register tools at load time.
 function shouldRegisterControlTools(pi: ExtensionAPI): boolean {
-	return isSessionControlRequested((name) => pi.getFlag(name));
+	return isSessionControlRequested((name) => pi.getFlag(name)) || isIntrayEnabledByConfig();
 }
 
 // ============================================================================
@@ -112,7 +113,7 @@ export default function (pi: ExtensionAPI) {
 	registerControlSessionsCommand(pi, state);
 
 	const refreshServer = async (ctx: ExtensionContext) => {
-		if (!isSessionControlRequested((name) => pi.getFlag(name))) {
+		if (!isSessionControlRequested((name) => pi.getFlag(name)) && !isIntrayEnabledByConfig()) {
 			await disableControlServer(state, ctx);
 			return;
 		}
