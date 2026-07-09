@@ -43,7 +43,7 @@
 import type {
 	ExtensionAPI,
 	ExtensionContext,
-} from "@mariozechner/pi-coding-agent";
+} from "@earendil-works/pi-coding-agent";
 import { renderSessionMessage } from "./pi/message-renderer.ts";
 import { maybeHandleStartupControlSend } from "./pi/startup-send.ts";
 import { registerControlSessionsCommand, registerSessionControlCommand } from "./pi/control-commands.ts";

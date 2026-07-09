@@ -1,7 +1,7 @@
-import type { MessageRenderer } from "@mariozechner/pi-coding-agent";
-import { getMarkdownTheme } from "@mariozechner/pi-coding-agent";
-import type { TextContent } from "@mariozechner/pi-ai";
-import { Box, Markdown, Spacer, Text } from "@mariozechner/pi-tui";
+import type { MessageRenderer } from "@earendil-works/pi-coding-agent";
+import { getMarkdownTheme } from "@earendil-works/pi-coding-agent";
+import type { TextContent } from "@earendil-works/pi-ai";
+import { Box, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
 
 const SENDER_INFO_PATTERN = /<sender_info>[\s\S]*?<\/sender_info>/g;
 

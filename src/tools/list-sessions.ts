@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 import { filterSessionsBySearch } from "../domain/index.ts";
 import { getLiveSessions } from "../infra/control-store.ts";

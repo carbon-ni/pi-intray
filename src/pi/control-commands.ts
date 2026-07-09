@@ -1,4 +1,4 @@
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { getLiveSessions } from "../infra/control-store.ts";
 import { filterSessionsBySearch, isSessionControlRequested, parseSessionControlAction, type SessionControlAction } from "../domain/index.ts";
 
